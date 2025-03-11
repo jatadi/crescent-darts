@@ -2,10 +2,11 @@
 
 import { useGame } from '@/contexts/GameContext';
 import ScoreInput from '@/components/game/ScoreInput';
-import Card from '@/components/ui/Card';
+import CricketLights from '@/components/game/CricketLights';
+import VictoryScreen from '@/components/game/VictoryScreen';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
-import VictoryScreen from '@/components/game/VictoryScreen';
+import { CricketPlayerState } from '@/types/game';
 
 export default function GamePlay() {
   const { state } = useGame();
@@ -24,49 +25,63 @@ export default function GamePlay() {
 
   const currentPlayer = state.players.find(p => p.current);
 
-  const getPlayerAverage = (playerId: string) => {
-    const stats = state.playerStats[playerId];
-    if (!stats || stats.dartsThrown === 0) return 0;
-    return (stats.totalScore / stats.dartsThrown).toFixed(1);
-  };
-
   return (
     <>
       {state.gameOver && <VictoryScreen />}
-      <div className="max-w-2xl mx-auto">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold mb-4">Game in Progress</h1>
-          <div className="grid grid-cols-2 gap-4 mb-6">
-            {state.players.map((player) => (
-              <Card 
-                key={player.id}
-                className={`${player.current ? 'border-2 border-blue-500' : ''}`}
-              >
-                <h3 className="font-semibold">{player.name}</h3>
-                <p className="text-2xl font-bold">{player.score}</p>
-                {state.gameType === 'x01' && (
-                  <p className="text-sm text-gray-500">
-                    Avg: {getPlayerAverage(player.id)} per dart
-                  </p>
-                )}
-              </Card>
-            ))}
-          </div>
-        </div>
+      <div className="relative min-h-screen">
+        {state.gameType === 'cricket' && (
+          <>
+            {/* Left player lights */}
+            <div className="fixed left-8 top-1/2 -translate-y-1/2">
+              <CricketLights player={state.players[0] as CricketPlayerState} position="left" />
+            </div>
 
-        {currentPlayer && (
-          <div className="mb-4">
-            <h2 className="text-xl font-semibold mb-2">
-              Current Turn: {currentPlayer.name}
-            </h2>
-            <p className="mb-4">
-              Darts thrown: {state.currentTurn.dartsThrown} | 
-              Scores: {state.currentTurn.scores.join(', ') || 'None'}
-            </p>
-          </div>
+            {/* Right player lights */}
+            <div className="fixed right-8 top-1/2 -translate-y-1/2">
+              <CricketLights player={state.players[state.players.length - 1] as CricketPlayerState} position="right" />
+            </div>
+          </>
         )}
 
-        <ScoreInput />
+        {/* Main game area */}
+        <div className="max-w-2xl mx-auto px-4">
+          <div className="mb-6">
+            <h1 className="text-3xl font-bold mb-4">Cricket</h1>
+            <div className="grid grid-cols-3 gap-4 mb-6">
+              {state.players.map((player) => (
+                <div 
+                  key={player.id}
+                  className={`text-center p-4 rounded ${player.current ? 'bg-yellow-400 text-black' : 'bg-gray-800 text-white'}`}
+                >
+                  <div className="font-bold">{player.name}</div>
+                  <div className="text-2xl">{player.score}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {currentPlayer && (
+            <div className="mb-4">
+              <h2 className="text-xl font-semibold mb-2">
+                Current Turn: {currentPlayer.name}
+              </h2>
+              <p className="mb-4">
+                Darts thrown: {state.currentTurn.dartsThrown} | 
+                Scores: {state.currentTurn.scores.join(', ') || 'None'}
+              </p>
+            </div>
+          )}
+
+          {state.gameType === 'cricket' && (
+            <div className="text-center mb-4">
+              <div className="text-xl font-bold">
+                Round {state.currentRound} / {state.settings.rounds}
+              </div>
+            </div>
+          )}
+
+          <ScoreInput />
+        </div>
       </div>
     </>
   );

@@ -11,8 +11,13 @@ import { useGame } from '@/contexts/GameContext';
 export default function NewGame() {
   const router = useRouter();
   const { dispatch } = useGame();
-  const [gameType, setGameType] = useState<'x01' | 'cricket'>('x01');
-  const [x01Score, setX01Score] = useState(501);
+  const [selectedPlayers, setSelectedPlayers] = useState<Player[]>([]);
+  const [gameType, setGameType] = useState<GameType>('x01');
+  const [settings, setSettings] = useState({
+    startingScore: 501,
+    doubleOut: false,
+    rounds: 15
+  });
   const [players, setPlayers] = useState<Player[]>([]);
   const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
 
@@ -47,7 +52,9 @@ export default function NewGame() {
       players: selectedPlayers,
       gameType,
       settings: {
-        startingScore: gameType === 'x01' ? x01Score : undefined,
+        startingScore: gameType === 'x01' ? settings.startingScore : undefined,
+        doubleOut: gameType === 'cricket' ? settings.doubleOut : undefined,
+        rounds: gameType === 'cricket' ? settings.rounds : undefined,
       },
     });
 
@@ -55,12 +62,12 @@ export default function NewGame() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto">
+    <div className="max-w-2xl mx-auto p-4">
       <h1 className="text-3xl font-bold mb-6">New Game</h1>
       
-      <Card className="mb-6">
-        <h2 className="text-xl font-semibold mb-4">Game Type</h2>
-        <div className="flex gap-4 mb-6">
+      <div className="mb-6">
+        <h2 className="text-xl font-semibold mb-2">Select Game Type</h2>
+        <div className="flex gap-4">
           <Button
             variant={gameType === 'x01' ? 'primary' : 'secondary'}
             onClick={() => setGameType('x01')}
@@ -74,22 +81,51 @@ export default function NewGame() {
             Cricket
           </Button>
         </div>
+      </div>
 
-        {gameType === 'x01' && (
+      <div className="mb-6">
+        <h2 className="text-xl font-semibold mb-2">Game Settings</h2>
+        {gameType === 'x01' ? (
+          <div className="space-y-4">
+            <div>
+              <label className="block mb-2">Starting Score</label>
+              <select
+                value={settings.startingScore}
+                onChange={(e) => setSettings({ ...settings, startingScore: Number(e.target.value) })}
+                className="w-full p-2 border rounded"
+              >
+                <option value={301}>301</option>
+                <option value={501}>501</option>
+                <option value={701}>701</option>
+              </select>
+            </div>
+            <div>
+              <label className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={settings.doubleOut}
+                  onChange={(e) => setSettings({ ...settings, doubleOut: e.target.checked })}
+                  className="mr-2"
+                />
+                Double Out
+              </label>
+            </div>
+          </div>
+        ) : (
           <div>
-            <h3 className="font-semibold mb-2">Starting Score</h3>
+            <label className="block mb-2">Number of Rounds</label>
             <select
-              value={x01Score}
-              onChange={(e) => setX01Score(Number(e.target.value))}
-              className="border rounded p-2 dark:bg-gray-700"
+              value={settings.rounds}
+              onChange={(e) => setSettings({ ...settings, rounds: Number(e.target.value) })}
+              className="w-full p-2 border rounded"
             >
-              <option value={301}>301</option>
-              <option value={501}>501</option>
-              <option value={701}>701</option>
+              <option value={15}>15 Rounds</option>
+              <option value={20}>20 Rounds</option>
+              <option value={25}>25 Rounds</option>
             </select>
           </div>
         )}
-      </Card>
+      </div>
 
       <Card className="mb-6">
         <h2 className="text-xl font-semibold mb-4">Select Players</h2>

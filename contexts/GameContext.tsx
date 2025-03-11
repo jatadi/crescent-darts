@@ -248,31 +248,44 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
 // Helper function for cricket scoring
 function handleCricketScore(state: GameState, action: { score: number; baseScore: number }) {
+  if (state.gameType !== 'cricket') return state;
+
   const currentTurn = state.currentTurn;
   const dartsThrown = currentTurn.dartsThrown + 1;
   const currentPlayer = state.players.find(p => p.id === currentTurn.playerId)!;
   const newScores = [...currentTurn.scores, action.score];
 
-  // Cricket scoring logic here...
+  // Determine which number was hit
+  const key = action.baseScore === 25 || action.baseScore === 50 ? 'bull' : action.baseScore.toString();
+  const marksToAdd = action.baseScore === 50 ? 2 : action.score / action.baseScore;
+
+  // Update players
   const updatedPlayers = state.players.map(player => {
     if (player.id === currentTurn.playerId) {
-      const scores = { ...player.cricketScores };
-      const key = action.baseScore === 25 || action.baseScore === 50 ? 'bull' : action.baseScore.toString();
-      const marksToAdd = action.baseScore === 50 ? 2 : action.score / action.baseScore;
-
-      if (scores[key]) {
-        scores[key].marks = Math.min(3, scores[key].marks + marksToAdd);
-        scores[key].closed = scores[key].marks >= 3;
+      const marks = { ...player.cricketScores };
+      
+      // Update marks for current player
+      if (marks[key]) {
+        const newMarks = Math.min(3, marks[key].marks + marksToAdd);
+        marks[key] = {
+          marks: newMarks,
+          closed: newMarks >= 3
+        };
       }
 
       return {
         ...player,
-        cricketScores: scores
+        cricketScores: marks
       };
     }
 
-    if (currentPlayer.cricketScores?.[action.baseScore.toString()]?.closed &&
-        !player.cricketScores?.[action.baseScore.toString()]?.closed) {
+    // Add points to opponents if:
+    // 1. Current player has closed the number
+    // 2. This opponent hasn't closed it
+    // 3. Current player hit the number after closing it
+    if (currentPlayer.cricketScores?.[key]?.closed && 
+        !player.cricketScores?.[key]?.closed && 
+        currentPlayer.cricketScores?.[key]?.marks >= 3) {
       return {
         ...player,
         score: player.score + action.score
@@ -282,6 +295,23 @@ function handleCricketScore(state: GameState, action: { score: number; baseScore
     return player;
   });
 
+  // Check for game end conditions
+  const isGameOver = () => {
+    // End if max rounds reached
+    if (state.currentRound >= state.settings.rounds) return true;
+
+    // End if a player has closed all numbers and has lowest score
+    const allNumbersClosed = (player: CricketPlayerState) => 
+      Object.values(player.cricketScores).every(score => score.closed);
+
+    const lowestScore = Math.min(...updatedPlayers.map(p => p.score));
+    const winner = updatedPlayers.find(p => 
+      allNumbersClosed(p as CricketPlayerState) && p.score === lowestScore
+    );
+
+    return !!winner;
+  };
+
   // Auto switch after 3 darts
   if (dartsThrown === 3) {
     const currentPlayerIndex = state.players.findIndex(p => p.current);
@@ -289,12 +319,20 @@ function handleCricketScore(state: GameState, action: { score: number; baseScore
     const nextRound = currentPlayerIndex === state.players.length - 1 ? 
       state.currentRound + 1 : state.currentRound;
 
-    return {
+    const gameOver = isGameOver();
+    const winnerId = gameOver ? 
+      updatedPlayers.reduce((lowest, p) => 
+        p.score < lowest.score ? p : lowest
+      ).id : undefined;
+
+    const finalState = {
       ...state,
       currentRound: nextRound,
+      gameOver,
+      winnerId,
       players: updatedPlayers.map((player, index) => ({
         ...player,
-        current: index === nextPlayerIndex,
+        current: gameOver ? false : index === nextPlayerIndex,
       })),
       currentTurn: {
         playerId: state.players[nextPlayerIndex].id,
@@ -303,6 +341,12 @@ function handleCricketScore(state: GameState, action: { score: number; baseScore
       },
       turns: [...state.turns, { playerId: currentTurn.playerId, scores: newScores }],
     };
+
+    if (gameOver) {
+      saveGameHistory(finalState).catch(console.error);
+    }
+
+    return finalState;
   }
 
   return {

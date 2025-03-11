@@ -16,11 +16,13 @@ export default function ScoreInput() {
     setMultiplier(1);
   };
 
-  const handleMiss = () => {
+  const handleMiss = (isWallMiss = false) => {
     dispatch({ type: 'ADD_SCORE', score: 0, baseScore: 0 });
     setMultiplier(1);
-    setShowMissAnimation(true);
-    setTimeout(() => setShowMissAnimation(false), 2000);
+    if (isWallMiss) {
+      setShowMissAnimation(true);
+      setTimeout(() => setShowMissAnimation(false), 2000);
+    }
   };
 
   if (state.gameType === 'cricket') {
@@ -77,7 +79,7 @@ export default function ScoreInput() {
               ))}
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-2 mt-4">
               <Button
                 variant="secondary"
                 onClick={() => dispatch({ type: 'UNDO_SCORE' })}
@@ -86,8 +88,15 @@ export default function ScoreInput() {
                 Undo
               </Button>
               <Button
+                onClick={() => handleMiss(false)}
+                disabled={state.gameOver}
+              >
+                Miss
+              </Button>
+              <Button
                 onClick={() => dispatch({ type: 'NEXT_PLAYER' })}
                 disabled={state.currentTurn.dartsThrown === 0}
+                className="col-span-2"
               >
                 Next Player
               </Button>
@@ -95,7 +104,7 @@ export default function ScoreInput() {
           </div>
 
           <button
-            onClick={handleMiss}
+            onClick={() => handleMiss(true)}
             disabled={state.gameOver}
             className="w-48 h-48 rounded-full bg-red-500 hover:bg-red-600 text-white text-2xl p-2 text-center flex items-center justify-center self-center disabled:opacity-50 disabled:cursor-not-allowed"
           >
@@ -170,7 +179,7 @@ export default function ScoreInput() {
             ))}
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-2 mt-4">
             <Button
               variant="secondary"
               onClick={() => dispatch({ type: 'UNDO_SCORE' })}
@@ -179,8 +188,15 @@ export default function ScoreInput() {
               Undo
             </Button>
             <Button
+              onClick={() => handleMiss(false)}
+              disabled={state.gameOver}
+            >
+              Miss
+            </Button>
+            <Button
               onClick={() => dispatch({ type: 'NEXT_PLAYER' })}
               disabled={state.currentTurn.dartsThrown === 0}
+              className="col-span-2"
             >
               Next Player
             </Button>
@@ -188,7 +204,7 @@ export default function ScoreInput() {
         </div>
 
         <button
-          onClick={handleMiss}
+          onClick={() => handleMiss(true)}
           disabled={state.gameOver}
           className="w-48 h-48 rounded-full bg-red-500 hover:bg-red-600 text-white text-2xl p-2 text-center flex items-center justify-center self-center disabled:opacity-50 disabled:cursor-not-allowed"
         >
