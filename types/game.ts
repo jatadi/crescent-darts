@@ -57,6 +57,12 @@ export type GameState = {
     playerId: string;
     scores: number[];
   }[];
+  playerStats: {
+    [playerId: string]: {
+      totalScore: number;
+      dartsThrown: number;
+    };
+  };
 } & (
   | {
       gameType: 'x01';

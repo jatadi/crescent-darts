@@ -1,44 +1,8 @@
 'use client';
 
 import { createContext, useContext, useReducer } from 'react';
-import { Player, GameType, GameSettings } from '@/types/game';
+import { Player, GameType, GameSettings, GameState } from '@/types/game';
 import { saveGameHistory } from '@/utils/db';
-
-export interface GameState {
-  gameType: GameType;
-  settings: GameSettings;
-  players: {
-    id: string;
-    name: string;
-    score: number;
-    current: boolean;
-    cricketScores?: {
-      [key: string]: {
-        marks: number;  // 0-3 marks
-        closed: boolean;
-      }
-    };
-  }[];
-  currentTurn: {
-    playerId: string;
-    dartsThrown: number;
-    scores: number[];
-  };
-  gameOver: boolean;
-  winnerId?: string;
-  currentRound: number;
-  maxRounds?: number;
-  turns: {
-    playerId: string;
-    scores: number[];
-  }[];
-  playerStats: {
-    [playerId: string]: {
-      totalScore: number;
-      dartsThrown: number;
-    };
-  };
-}
 
 type GameAction =
   | { type: 'ADD_SCORE'; score: number; baseScore: number }
