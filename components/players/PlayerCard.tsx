@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Player } from '@/types/game';
 import { uploadPlayerPhoto } from '@/utils/db';
 import CameraModal from '../ui/CameraModal';
+import Image from 'next/image';
 
 interface PlayerCardProps {
   player: Player;
@@ -30,11 +31,13 @@ export default function PlayerCard({ player, onDelete }: PlayerCardProps) {
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow flex items-center justify-between">
       <div className="flex items-center gap-4">
-        {player.photoUrl ? (
-          <img 
-            src={player.photoUrl} 
+        {player.photo_url ? (
+          <Image 
+            src={player.photo_url} 
             alt={player.name}
-            className="w-12 h-12 rounded-full object-cover"
+            width={48}
+            height={48}
+            className="rounded-full object-cover"
           />
         ) : (
           <div className="w-12 h-12 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center">

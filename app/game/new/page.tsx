@@ -10,14 +10,13 @@ import { useGame } from '@/contexts/GameContext';
 
 interface PlayerSelectionProps {
   players: Player[];
-  selectedPlayers: Player[];
-  onTogglePlayer: (player: Player) => void;
+  selectedPlayerIds: string[];
+  onTogglePlayer: (playerId: string) => void;
 }
 
 export default function NewGame() {
   const router = useRouter();
   const { dispatch } = useGame();
-  const [selectedPlayers, setSelectedPlayers] = useState<Player[]>([]);
   const [gameType, setGameType] = useState<GameType>('x01');
   const [settings, setSettings] = useState({
     startingScore: 501,
@@ -141,8 +140,8 @@ export default function NewGame() {
         <h2 className="text-xl font-semibold mb-4">Select Players</h2>
         <PlayerSelection
           players={players}
-          selectedPlayers={players.filter(p => selectedPlayerIds.includes(p.id))}
-          onTogglePlayer={(player) => togglePlayer(player.id)}
+          selectedPlayerIds={selectedPlayerIds}
+          onTogglePlayer={(playerId) => togglePlayer(playerId)}
         />
       </Card>
 
@@ -158,15 +157,15 @@ export default function NewGame() {
   );
 }
 
-function PlayerSelection({ players, selectedPlayers, onTogglePlayer }: PlayerSelectionProps) {
+function PlayerSelection({ players, selectedPlayerIds, onTogglePlayer }: PlayerSelectionProps) {
   return (
     <div className="grid grid-cols-2 gap-4 mb-6">
       {players.map((player) => (
         <button
           key={player.id}
-          onClick={() => onTogglePlayer(player)}
+          onClick={() => onTogglePlayer(player.id)}
           className={`flex items-center gap-3 p-4 rounded-lg border-2 transition-colors ${
-            selectedPlayers.includes(player) 
+            selectedPlayerIds.includes(player.id) 
               ? 'border-yellow-400 bg-yellow-50 dark:bg-yellow-900/20' 
               : 'border-gray-200 hover:border-gray-300 dark:border-gray-700'
           }`}

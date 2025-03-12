@@ -5,6 +5,7 @@ import { useGame } from '@/contexts/GameContext';
 import Button from '@/components/ui/Button';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
+import Image from 'next/image';
 
 export default function VictoryScreen() {
   const { state } = useGame();
@@ -74,10 +75,12 @@ export default function VictoryScreen() {
           }}
         >
           {winner.photo_url ? (
-            <img 
+            <Image 
               src={winner.photo_url}
               alt={winner.name}
-              className="w-128 h-128 rounded-full mx-auto object-cover"
+              width={128}
+              height={128}
+              className="rounded-full object-cover"
             />
           ) : (
             <div className="w-48 h-48 rounded-full bg-gray-700 mx-auto flex items-center justify-center">

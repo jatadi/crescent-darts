@@ -7,6 +7,7 @@ import VictoryScreen from '@/components/game/VictoryScreen';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { CricketPlayerState, GameState, X01Settings, CricketSettings } from '@/types/game';
+import Image from 'next/image';
 
 const getPlayerAverage = (state: GameState, playerId: string) => {
   const stats = state.playerStats[playerId];
@@ -56,10 +57,12 @@ export default function GamePlay() {
                   }`}
                 >
                   {player.photo_url ? (
-                    <img 
+                    <Image 
                       src={player.photo_url} 
                       alt={player.name}
-                      className="w-12 h-12 rounded-full object-cover mb-2"
+                      width={48}
+                      height={48}
+                      className="rounded-full object-cover"
                     />
                   ) : (
                     <div className="w-12 h-12 rounded-full bg-gray-700 flex items-center justify-center mb-2">

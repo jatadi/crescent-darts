@@ -15,27 +15,51 @@ export default function CameraModal({ onCapture, onSkip, onClose }: CameraModalP
   const [error, setError] = useState<string>('');
 
   useEffect(() => {
-    startCamera();
+    let mounted = true;
+
+    const init = async () => {
+      if (mounted) {
+        await startCamera();
+      }
+    };
+
+    init();
+
     return () => {
-      // Cleanup: stop all tracks when component unmounts
+      mounted = false;
       if (stream) {
-        stream.getTracks().forEach(track => track.stop());
+        stream.getTracks().forEach(track => {
+          track.stop();
+          stream.removeTrack(track);
+        });
       }
     };
   }, []);
 
   const startCamera = async () => {
     try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'user' } 
-      });
-      setStream(mediaStream);
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
+      // First try the environment camera (back camera on phones)
+      try {
+        const mediaStream = await navigator.mediaDevices.getUserMedia({ 
+          video: { facingMode: 'environment' } 
+        });
+        setStream(mediaStream);
+        if (videoRef.current) {
+          videoRef.current.srcObject = mediaStream;
+        }
+      } catch {
+        // If environment camera fails, try user camera (front camera/webcam)
+        const mediaStream = await navigator.mediaDevices.getUserMedia({ 
+          video: { facingMode: 'user' } 
+        });
+        setStream(mediaStream);
+        if (videoRef.current) {
+          videoRef.current.srcObject = mediaStream;
+        }
       }
     } catch (err) {
-      setError('Could not access camera');
-      console.error(err);
+      setError('Could not access camera. Please ensure camera permissions are granted.');
+      console.error('Camera error:', err);
     }
   };
 
