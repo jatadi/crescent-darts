@@ -2,14 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import { Player } from '@/types/game';
-import { addPlayer, getPlayers, deletePlayer } from '@/utils/db';
-import Button from '@/components/ui/Button';
+import { getPlayers, deletePlayer } from '@/utils/db';
 import Card from '@/components/ui/Card';
 import PlayerCard from '@/components/players/PlayerCard';
+import AddPlayerForm from '@/components/players/AddPlayerForm';
 
 export default function PlayersPage() {
   const [players, setPlayers] = useState<Player[]>([]);
-  const [newPlayerName, setNewPlayerName] = useState('');
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -20,17 +19,6 @@ export default function PlayersPage() {
     const playerList = await getPlayers();
     setPlayers(playerList);
     setIsLoading(false);
-  }
-
-  async function handleAddPlayer(e: React.FormEvent) {
-    e.preventDefault();
-    if (newPlayerName.trim()) {
-      const player = await addPlayer(newPlayerName);
-      if (player) {
-        setPlayers([player, ...players]);
-        setNewPlayerName('');
-      }
-    }
   }
 
   async function handleDeletePlayer(id: string) {
@@ -47,16 +35,7 @@ export default function PlayersPage() {
       <h1 className="text-3xl font-bold mb-6">Players</h1>
 
       <Card className="mb-6">
-        <form onSubmit={handleAddPlayer} className="flex gap-2">
-          <input
-            type="text"
-            value={newPlayerName}
-            onChange={(e) => setNewPlayerName(e.target.value)}
-            placeholder="Enter player name"
-            className="flex-1 border rounded p-2 dark:bg-gray-700"
-          />
-          <Button type="submit">Add Player</Button>
-        </form>
+        <AddPlayerForm onPlayerAdded={loadPlayers} />
       </Card>
 
       {isLoading ? (

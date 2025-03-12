@@ -12,10 +12,13 @@ export default function AddPlayerForm({ onPlayerAdded }: { onPlayerAdded: () => 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('Form submitted with name:', name);
+    
     if (!name.trim()) return;
 
     setPendingName(name.trim());
     setShowCamera(true);
+    console.log('Camera should show now');
   };
 
   const handlePhotoCapture = async (blob: Blob) => {
@@ -51,6 +54,7 @@ export default function AddPlayerForm({ onPlayerAdded }: { onPlayerAdded: () => 
           onChange={(e) => setName(e.target.value)}
           placeholder="Enter player name"
           className="flex-1 border rounded p-2 dark:bg-gray-700"
+          required
         />
         <Button type="submit">Add Player</Button>
       </form>
