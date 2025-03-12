@@ -283,43 +283,55 @@ function handleCricketScore(state: GameState, action: { score: number; baseScore
 
   // Determine which number was hit
   const key = action.baseScore === 25 || action.baseScore === 50 ? 'bull' : action.baseScore.toString();
+  
+  // Return early if not a valid cricket number
+  if (!['15', '16', '17', '18', '19', '20', 'bull'].includes(key)) {
+    return {
+      ...state,
+      currentTurn: {
+        ...currentTurn,
+        dartsThrown,
+        scores: newScores,
+      },
+    };
+  }
+
   const marksToAdd = action.baseScore === 50 ? 2 : action.score / action.baseScore;
 
-  // Update players
-  const updatedPlayers = state.players.map(player => {
+  // Calculate new marks for the hit number
+  const currentMarks = currentPlayer.cricketScores[key].marks;
+  const newMarks = currentMarks + marksToAdd;
+  const overflowMarks = Math.max(0, newMarks - 3);  // Calculate overflow marks
+
+  // Update the cricket scores for all players
+  let updatedPlayers = state.players.map(player => {
     if (player.id === currentTurn.playerId) {
-      const marks = { ...player.cricketScores };
-      
-      // Update marks for current player
-      if (marks[key]) {
-        const newMarks = Math.min(3, marks[key].marks + marksToAdd);
-        marks[key] = {
-          marks: newMarks,
-          closed: newMarks >= 3
-        };
-      }
-
+      // Update current player
       return {
         ...player,
-        cricketScores: marks
+        cricketScores: {
+          ...player.cricketScores,
+          [key]: {
+            marks: Math.min(newMarks, 3),  // Cap at 3 marks
+            closed: newMarks >= 3
+          }
+        },
+        score: player.score  // Score will be updated below if needed
       };
     }
-
-    // Add points to opponents if:
-    // 1. Current player has closed the number
-    // 2. This opponent hasn't closed it
-    // 3. Current player hit the number after closing it
-    if (currentPlayer.cricketScores?.[key]?.closed && 
-        !player.cricketScores?.[key]?.closed && 
-        currentPlayer.cricketScores?.[key]?.marks >= 3) {
-      return {
-        ...player,
-        score: player.score + action.score
-      };
-    }
-
     return player;
-  });
+  }) as CricketPlayerState[];
+
+  // Calculate and apply points immediately if overflow
+  if (overflowMarks > 0 && !isNumberClosedByOthers(key, updatedPlayers, currentTurn.playerId)) {
+    const pointsToAdd = overflowMarks * action.baseScore;
+    updatedPlayers = updatedPlayers.map(player => ({
+      ...player,
+      // Add points to opponents who haven't closed the number
+      score: (player.id !== currentTurn.playerId && !player.cricketScores[key].closed) ? 
+        player.score + pointsToAdd : player.score
+    }));
+  }
 
   // Check for game end conditions
   const isGameOver = () => {
@@ -384,6 +396,17 @@ function handleCricketScore(state: GameState, action: { score: number; baseScore
       scores: newScores,
     },
   };
+}
+
+// Helper function to check if a number is closed by other players
+function isNumberClosedByOthers(
+  number: string, 
+  players: CricketPlayerState[], 
+  currentPlayerId: string
+): boolean {
+  return players.every(player => 
+    player.id === currentPlayerId || player.cricketScores[number].closed
+  );
 }
 
 export function GameProvider({ children }: { children: React.ReactNode }) {
