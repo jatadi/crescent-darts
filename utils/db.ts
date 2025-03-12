@@ -161,7 +161,15 @@ export async function getGameHistory() {
     return [];
   }
 
-  return data;
+  // Convert timestamps to EST
+  return data.map(game => ({
+    ...game,
+    created_at: new Date(game.created_at).toLocaleString('en-US', {
+      timeZone: 'America/New_York',
+      dateStyle: 'medium',
+      timeStyle: 'short'
+    })
+  }));
 }
 
 export async function uploadPlayerPhoto(playerId: string, photoBlob: Blob): Promise<string | null> {
