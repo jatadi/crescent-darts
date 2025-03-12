@@ -1,27 +1,54 @@
 # Crescent Darts 🎯
 
-A modern darts scoring application supporting multiple game modes:
-- X01 (301, 501, etc.)
-- Cricket
+A modern web application for tracking darts games, built with Next.js and Supabase.
 
 ## Features
-- Multiple game modes
-- Player management
-- Game history
-- Real-time scoring
-- Statistics tracking
 
-## Tech Stack
-- Next.js 14
-- TypeScript
-- Tailwind CSS
-- Supabase
+- **Multiple Game Types**
+  - X01 (301, 501, 701)
+  - Cricket
+  
+- **Player Management**
+  - Create players with profile photos
+  - Take photos using device camera
+  - Delete players
+  
+- **Game Features**
+  - Real-time score tracking
+  - Turn management
+  - Statistics tracking
+  - Game history
+  - Victory celebrations
+  
+- **Responsive Design**
+  - Works on mobile and desktop
+  - Dark mode support
+
+## Technical Stack
+
+- **Frontend**
+  - Next.js 14 (App Router)
+  - TypeScript
+  - Tailwind CSS
+  - Framer Motion
+
+- **Backend**
+  - Supabase (Database & Storage)
+  - PostgreSQL
+
+## Database Schema
+
+### Tables
+- `players` - Store player information
+- `games` - Track game sessions
+- `game_players` - Record player stats for each game
+- `turns` - Store individual turn data
 
 ## Getting Started
 
 1. Clone the repository
 ```bash
-git clone https://github.com/yourusername/crescent-darts.git
+git clone [repository-url]
 ```
 
 2. Install dependencies
@@ -30,8 +57,9 @@ npm install
 ```
 
 3. Set up environment variables
-```bash
-cp .env.example .env.local
+```env
+NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
 ```
 
 4. Run the development server
@@ -39,21 +67,31 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) to start playing!
+## Game Rules
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### X01
+- Players start with 301, 501, or 701 points
+- Must reach exactly zero to win
+- Optional double-out rule
 
-## Learn More
+### Cricket
+- Close numbers 15-20 and bullseye
+- Three marks to close a number
+- Score points on open numbers
+- Lowest score wins when all numbers are closed
 
-To learn more about Next.js, take a look at the following resources:
+## Contributing
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Contributions are welcome! Please feel free to submit a Pull Request.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Deployment
 
-## Deploy on Vercel
+This project is deployed using [Vercel](https://vercel.com). To deploy your own instance:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1. Fork this repository
+2. Sign up for Vercel
+3. Import your forked repository
+4. Add your Supabase environment variables
+5. Deploy!
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Live demo: [your-url-here](https://your-url-here)
