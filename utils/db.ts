@@ -8,9 +8,8 @@ const supabaseClient = createClient(
 );
 
 export async function addPlayer(name: string, photoBlob?: Blob | null): Promise<Player | null> {
-  let photoUrl;
-  if (photoBlob) {
-    // First create player to get ID
+  try {
+    // First create the player
     const { data: player, error } = await supabase
       .from('players')
       .insert([{ name }])
@@ -22,25 +21,30 @@ export async function addPlayer(name: string, photoBlob?: Blob | null): Promise<
       return null;
     }
 
-    // Then upload photo and update player
-    photoUrl = await uploadPlayerPhoto(player.id, photoBlob);
-  }
+    // If we have a photo, upload it and update the player
+    if (photoBlob) {
+      const photoUrl = await uploadPlayerPhoto(player.id, photoBlob);
+      if (photoUrl) {
+        const { data: updatedPlayer, error: updateError } = await supabase
+          .from('players')
+          .update({ photo_url: photoUrl })
+          .eq('id', player.id)
+          .select()
+          .single();
 
-  // Create player without photo or update existing player with photo
-  const { data, error } = await supabase
-    .from('players')
-    .upsert([
-      { name, photo_url: photoUrl }
-    ])
-    .select()
-    .single();
+        if (updateError) {
+          console.error('Error updating player photo:', updateError);
+          return player;
+        }
+        return updatedPlayer;
+      }
+    }
 
-  if (error) {
-    console.error('Error creating player:', error);
+    return player;
+  } catch (error) {
+    console.error('Error in addPlayer:', error);
     return null;
   }
-
-  return data as Player;
 }
 
 export async function getPlayers(): Promise<Player[]> {
