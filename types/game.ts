@@ -63,6 +63,8 @@ export type GameState = {
       dartsThrown: number;
     };
   };
+  maxRounds?: number;
+  currentRound: number;
 } & (
   | {
       gameType: 'x01';
@@ -73,6 +75,8 @@ export type GameState = {
       gameType: 'cricket';
       settings: CricketSettings;
       players: CricketPlayerState[];
-      currentRound: number;
     }
-); 
+);
+
+// Add this to your existing types/game.ts
+export type GameSettings = X01Settings | CricketSettings; 

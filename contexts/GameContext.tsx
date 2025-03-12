@@ -1,7 +1,16 @@
 'use client';
 
 import { createContext, useContext, useReducer } from 'react';
-import { Player, GameType, GameSettings, GameState } from '@/types/game';
+import { 
+  Player, 
+  GameType, 
+  GameSettings, 
+  GameState, 
+  X01Settings, 
+  CricketSettings,
+  X01PlayerState,
+  CricketPlayerState 
+} from '@/types/game';
 import { saveGameHistory } from '@/utils/db';
 
 type GameAction =
@@ -19,20 +28,41 @@ function gameReducer(state: GameState, action: GameAction): GameState {
   switch (action.type) {
     case 'START_GAME': {
       const startingScore = action.gameType === 'x01' ? 
-        (action.settings.startingScore || 501) : 0;
+        ((action.settings as X01Settings).startingScore || 501) : 0;
 
-      return {
-        ...state,
-        gameType: action.gameType,
-        settings: action.settings,
-        currentRound: 1,
-        maxRounds: action.gameType === 'cricket' ? action.settings.rounds : undefined,
-        players: action.players.map((player, index) => ({
-          id: player.id,
-          name: player.name,
+      if (action.gameType === 'x01') {
+        const players = action.players.map((player, index) => ({
+          ...player,
           score: startingScore,
           current: index === 0,
-          cricketScores: action.gameType === 'cricket' ? {
+          stats: { totalScore: 0, dartsThrown: 0 }
+        })) as X01PlayerState[];
+
+        return {
+          ...state,
+          gameType: 'x01' as const,
+          settings: action.settings,
+          currentRound: 1,
+          maxRounds: undefined,
+          players,
+          currentTurn: {
+            playerId: players[0].id,
+            dartsThrown: 0,
+            scores: [],
+          },
+          gameOver: false,
+          turns: [],
+          playerStats: players.reduce((acc, player) => ({
+            ...acc,
+            [player.id]: { totalScore: 0, dartsThrown: 0 }
+          }), {})
+        } as GameState;
+      } else {
+        const players = action.players.map((player, index) => ({
+          ...player,
+          score: startingScore,
+          current: index === 0,
+          cricketScores: {
             '15': { marks: 0, closed: false },
             '16': { marks: 0, closed: false },
             '17': { marks: 0, closed: false },
@@ -40,20 +70,29 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             '19': { marks: 0, closed: false },
             '20': { marks: 0, closed: false },
             'bull': { marks: 0, closed: false }
-          } : undefined
-        })),
-        currentTurn: {
-          playerId: action.players[0].id,
-          dartsThrown: 0,
-          scores: [],
-        },
-        gameOver: false,
-        turns: [],
-        playerStats: action.players.reduce((acc, player) => ({
-          ...acc,
-          [player.id]: { totalScore: 0, dartsThrown: 0 }
-        }), {}),
-      };
+          }
+        })) as CricketPlayerState[];
+
+        return {
+          ...state,
+          gameType: 'cricket' as const,
+          settings: action.settings,
+          currentRound: 1,
+          maxRounds: (action.settings as CricketSettings).rounds,
+          players,
+          currentTurn: {
+            playerId: players[0].id,
+            dartsThrown: 0,
+            scores: [],
+          },
+          gameOver: false,
+          turns: [],
+          playerStats: players.reduce((acc, player) => ({
+            ...acc,
+            [player.id]: { totalScore: 0, dartsThrown: 0 }
+          }), {})
+        } as GameState;
+      }
     }
 
     case 'ADD_SCORE': {
@@ -67,13 +106,19 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       const newScores = [...currentTurn.scores, action.score];
       const dartsThrown = currentTurn.dartsThrown + 1;
       const currentPlayer = state.players.find(p => p.id === currentTurn.playerId)!;
+      
+      // Get starting score for the turn
+      const turnStartScore = currentTurn.dartsThrown === 0 ? 
+        currentPlayer.score : 
+        currentPlayer.score + currentTurn.scores.reduce((sum, score) => sum + score, 0);
+      
       const newScore = currentPlayer.score - action.score;
 
-      // Always update stats for every throw
+      // Update stats before any return conditions
       const updatedStats = {
         ...state.playerStats,
         [currentTurn.playerId]: {
-          totalScore: state.playerStats[currentTurn.playerId].totalScore + (action.score || 0),
+          totalScore: state.playerStats[currentTurn.playerId].totalScore + action.score,
           dartsThrown: state.playerStats[currentTurn.playerId].dartsThrown + 1
         }
       };
@@ -81,15 +126,16 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       // Handle bust conditions
       if (newScore < 0 || newScore === 1 || 
           (state.settings.doubleOut && newScore === 0 && action.baseScore * 2 !== action.score)) {
-        // On bust, switch to next player immediately
         const currentPlayerIndex = state.players.findIndex(p => p.current);
         const nextPlayerIndex = (currentPlayerIndex + 1) % state.players.length;
 
         return {
           ...state,
-          players: state.players.map((player, index) => ({
+          players: (state.players as X01PlayerState[]).map((player, index) => ({
             ...player,
-            current: index === nextPlayerIndex
+            current: index === nextPlayerIndex,
+            // Reset score to start of turn if current player
+            score: player.id === currentTurn.playerId ? turnStartScore : player.score
           })),
           currentTurn: {
             playerId: state.players[nextPlayerIndex].id,
@@ -98,24 +144,17 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           },
           turns: [...state.turns, { playerId: currentTurn.playerId, scores: newScores }],
           playerStats: updatedStats
-        };
+        } as GameState;
       }
-
-      // Update players with new score
-      const players = state.players.map(player => {
-        if (player.id === currentTurn.playerId) {
-          return { ...player, score: newScore };
-        }
-        return player;
-      });
 
       // Check for win
       if (newScore === 0) {
         const finalState = {
           ...state,
-          players: players.map(p => ({
+          players: (state.players as X01PlayerState[]).map(p => ({
             ...p,
-            current: false
+            current: false,
+            score: p.id === currentTurn.playerId ? newScore : p.score
           })),
           gameOver: true,
           winnerId: currentTurn.playerId,
@@ -126,7 +165,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           },
           turns: [...state.turns, { playerId: currentTurn.playerId, scores: newScores }],
           playerStats: updatedStats
-        };
+        } as GameState;
 
         saveGameHistory(finalState).catch(console.error);
         return finalState;
@@ -139,9 +178,10 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
         return {
           ...state,
-          players: players.map((player, index) => ({
+          players: (state.players as X01PlayerState[]).map((player, index) => ({
             ...player,
-            current: index === nextPlayerIndex
+            current: index === nextPlayerIndex,
+            score: player.id === currentTurn.playerId ? newScore : player.score
           })),
           currentTurn: {
             playerId: state.players[nextPlayerIndex].id,
@@ -150,49 +190,71 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           },
           turns: [...state.turns, { playerId: currentTurn.playerId, scores: newScores }],
           playerStats: updatedStats
-        };
+        } as GameState;
       }
 
+      // Regular score update
       return {
         ...state,
-        players,
+        players: (state.players as X01PlayerState[]).map(player => ({
+          ...player,
+          score: player.id === currentTurn.playerId ? newScore : player.score
+        })),
         currentTurn: {
           ...currentTurn,
           dartsThrown,
           scores: newScores
         },
         playerStats: updatedStats
-      };
+      } as GameState;
     }
 
     case 'NEXT_PLAYER': {
       const currentPlayerIndex = state.players.findIndex(p => p.current);
       const nextPlayerIndex = (currentPlayerIndex + 1) % state.players.length;
 
-      return {
-        ...state,
-        players: state.players.map((player, index) => ({
-          ...player,
-          current: index === nextPlayerIndex,
-        })),
-        currentTurn: {
-          playerId: state.players[nextPlayerIndex].id,
-          dartsThrown: 0,
-          scores: [],
-        },
-      };
+      if (state.gameType === 'x01') {
+        return {
+          ...state,
+          players: (state.players as X01PlayerState[]).map((player, index) => ({
+            ...player,
+            current: index === nextPlayerIndex,
+          })),
+          currentTurn: {
+            playerId: state.players[nextPlayerIndex].id,
+            dartsThrown: 0,
+            scores: [],
+          },
+        } as GameState;
+      } else {
+        return {
+          ...state,
+          players: (state.players as CricketPlayerState[]).map((player, index) => ({
+            ...player,
+            current: index === nextPlayerIndex,
+          })),
+          currentTurn: {
+            playerId: state.players[nextPlayerIndex].id,
+            dartsThrown: 0,
+            scores: [],
+          },
+        } as GameState;
+      }
     }
 
     case 'UNDO_SCORE': {
       if (state.currentTurn.scores.length === 0) return state;
 
       const lastScore = state.currentTurn.scores[state.currentTurn.scores.length - 1];
-      const players = state.players.map(player => {
-        if (player.id === state.currentTurn.playerId) {
-          return { ...player, score: player.score + lastScore };
-        }
-        return player;
-      });
+      const players = state.gameType === 'x01' ?
+        (state.players as X01PlayerState[]).map(player => ({
+          ...player,
+          score: player.id === state.currentTurn.playerId ? player.score + lastScore : player.score
+        })) :
+        (state.players as CricketPlayerState[]).map(player => ({
+          ...player,
+          score: player.id === state.currentTurn.playerId ? player.score + lastScore : player.score
+        }));
 
       return {
         ...state,
@@ -202,7 +264,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           dartsThrown: state.currentTurn.dartsThrown - 1,
           scores: state.currentTurn.scores.slice(0, -1),
         },
-      };
+      } as GameState;
     }
 
     default:
@@ -327,7 +389,10 @@ function handleCricketScore(state: GameState, action: { score: number; baseScore
 export function GameProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(gameReducer, {
     gameType: 'x01',
-    settings: {},
+    settings: {
+      startingScore: 501,
+      doubleOut: false
+    },
     players: [],
     currentTurn: {
       playerId: '',
@@ -337,7 +402,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     gameOver: false,
     turns: [],
     playerStats: {},
-    currentRound: 1
+    currentRound: 1,
+    winnerId: undefined
   });
 
   return (

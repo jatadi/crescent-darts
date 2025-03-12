@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import { getPlayers } from '@/utils/db';
-import { Player } from '@/types/game';
+import { Player, GameType } from '@/types/game';
 import { useGame } from '@/contexts/GameContext';
 
 export default function NewGame() {
@@ -16,7 +16,7 @@ export default function NewGame() {
   const [settings, setSettings] = useState({
     startingScore: 501,
     doubleOut: false,
-    rounds: 15
+    rounds: 15 as 15 | 20
   });
   const [players, setPlayers] = useState<Player[]>([]);
   const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
@@ -51,10 +51,11 @@ export default function NewGame() {
       type: 'START_GAME',
       players: selectedPlayers,
       gameType,
-      settings: {
-        startingScore: gameType === 'x01' ? settings.startingScore : undefined,
-        doubleOut: gameType === 'cricket' ? settings.doubleOut : undefined,
-        rounds: gameType === 'cricket' ? settings.rounds : undefined,
+      settings: gameType === 'x01' ? {
+        startingScore: settings.startingScore,
+        doubleOut: settings.doubleOut
+      } : {
+        rounds: settings.rounds
       },
     });
 
@@ -116,7 +117,10 @@ export default function NewGame() {
             <label className="block mb-2">Number of Rounds</label>
             <select
               value={settings.rounds}
-              onChange={(e) => setSettings({ ...settings, rounds: Number(e.target.value) })}
+              onChange={(e) => setSettings({ 
+                ...settings, 
+                rounds: Number(e.target.value) as 15 | 20 
+              })}
               className="w-full p-2 border rounded"
             >
               <option value={15}>15 Rounds</option>
