@@ -75,8 +75,10 @@ export default function CameraModal({ onCapture, onSkip, onClose }: CameraModalP
       ctx.drawImage(videoRef.current, 0, 0);
       canvas.toBlob((blob) => {
         if (blob) {
-          onCapture(blob);
+          // Stop the camera first
           stopCamera();
+          // Then call onCapture
+          onCapture(blob);
         }
       }, 'image/jpeg', 0.8);
     }
@@ -84,7 +86,10 @@ export default function CameraModal({ onCapture, onSkip, onClose }: CameraModalP
 
   const stopCamera = () => {
     if (stream) {
-      stream.getTracks().forEach(track => track.stop());
+      stream.getTracks().forEach(track => {
+        track.stop();
+        stream.removeTrack(track);
+      });
       setStream(null);
     }
     onClose();

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import Button from '@/components/ui/Button';
 import { useGame } from '@/contexts/GameContext';
 import MissAnimation from './MissAnimation';
@@ -10,8 +10,33 @@ export default function ScoreInput() {
   const [multiplier, setMultiplier] = useState<1 | 2 | 3>(1);
   const [showMissAnimation, setShowMissAnimation] = useState(false);
 
+  const playSound = useCallback((type: 'single' | 'double' | 'triple') => {
+    const sound = new Audio(`/sounds/${type}.mp3`);
+    sound.volume = 0.5;
+    
+    const playPromise = sound.play();
+    if (playPromise !== undefined) {
+      playPromise.catch(error => {
+        if (error.name === 'AbortError') {
+          console.log('Sound play aborted - this is normal when navigating');
+        } else {
+          console.error('Error playing sound:', error);
+        }
+      });
+    }
+  }, []);
+
   const handleScore = (baseScore: number) => {
+    if (state.gameOver) return;
+
+    // Calculate score with multiplier
     const score = baseScore * multiplier;
+
+    // Play sound if it's a double or triple
+    if (multiplier === 2) playSound('double');
+    else if (multiplier === 3) playSound('triple');
+    
+    // Dispatch score and reset multiplier
     dispatch({ type: 'ADD_SCORE', score, baseScore });
     setMultiplier(1);
   };
