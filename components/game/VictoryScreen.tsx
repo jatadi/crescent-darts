@@ -21,6 +21,14 @@ export default function VictoryScreen() {
       color: colors[Math.floor(Math.random() * colors.length)]
     }));
     setParticles(newParticles);
+
+    const victorySound = new Audio('/sounds/victory.mp3');
+    victorySound.volume = 0.5;
+    victorySound.play().catch(console.error);
+
+    return () => {
+      victorySound.pause();
+    };
   }, []);
 
   return (

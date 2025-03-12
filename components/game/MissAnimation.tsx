@@ -20,7 +20,7 @@ export default function MissAnimation() {
   };
 
   useEffect(() => {
-    // Create 20 particles with random positions and delays
+    // Create particles
     const newParticles = Array.from({ length: 20 }, (_, i) => ({
       id: i,
       left: `${Math.random() * 100}%`,
@@ -28,9 +28,17 @@ export default function MissAnimation() {
     }));
     setParticles(newParticles);
 
-    // Clean up particles after animation
+    // Play miss sound
+    const missSound = new Audio('/sounds/miss.mp3');
+    missSound.volume = 0.6;
+    missSound.play().catch(console.error);
+
+    // Clean up particles and sounds after animation
     const timer = setTimeout(() => setParticles([]), 2000);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      missSound.pause();
+    };
   }, []);
 
   return (
