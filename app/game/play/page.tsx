@@ -51,10 +51,21 @@ export default function GamePlay() {
               {state.players.map((player) => (
                 <div 
                   key={player.id}
-                  className={`text-center p-4 rounded ${
+                  className={`flex flex-col items-center p-4 rounded ${
                     player.current ? 'bg-yellow-400 text-black' : 'bg-gray-800 text-white'
                   }`}
                 >
+                  {player.photo_url ? (
+                    <img 
+                      src={player.photo_url} 
+                      alt={player.name}
+                      className="w-12 h-12 rounded-full object-cover mb-2"
+                    />
+                  ) : (
+                    <div className="w-12 h-12 rounded-full bg-gray-700 flex items-center justify-center mb-2">
+                      <span className="text-xl">{player.name[0]}</span>
+                    </div>
+                  )}
                   <div className="font-bold">{player.name}</div>
                   <div className="text-2xl">{player.score}</div>
                   {state.gameType === 'x01' && (

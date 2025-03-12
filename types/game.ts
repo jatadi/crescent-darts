@@ -17,6 +17,7 @@ export interface X01Settings {
 export interface X01PlayerState {
   id: string;
   name: string;
+  photo_url?: string;
   score: number;
   current: boolean;
   stats: {
@@ -33,6 +34,7 @@ export interface CricketSettings {
 export interface CricketPlayerState {
   id: string;
   name: string;
+  photo_url?: string;
   score: number;
   current: boolean;
   cricketScores: {

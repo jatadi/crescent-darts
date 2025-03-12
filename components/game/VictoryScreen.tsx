@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useGame } from '@/contexts/GameContext';
 import Button from '@/components/ui/Button';
 import { useRouter } from 'next/navigation';
+import { motion } from 'framer-motion';
 
 export default function VictoryScreen() {
   const { state } = useGame();
@@ -44,6 +45,8 @@ export default function VictoryScreen() {
     };
   }, []);
 
+  if (!winner) return null;
+
   return (
     <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center">
       {particles.map(particle => (
@@ -59,11 +62,34 @@ export default function VictoryScreen() {
       ))}
 
       <div className="text-center z-10">
+        <motion.div
+          className="mb-6"
+          animate={{
+            scale: [1, 1.1, 1],
+          }}
+          transition={{
+            duration: 2,
+            repeat: Infinity,
+            ease: "easeInOut"
+          }}
+        >
+          {winner.photo_url ? (
+            <img 
+              src={winner.photo_url}
+              alt={winner.name}
+              className="w-128 h-128 rounded-full mx-auto object-cover"
+            />
+          ) : (
+            <div className="w-48 h-48 rounded-full bg-gray-700 mx-auto flex items-center justify-center">
+              <span className="text-6xl">{winner.name[0]}</span>
+            </div>
+          )}
+        </motion.div>
         <h1 className="text-6xl font-bold text-yellow-400 mb-4 animate-bounce">
           GAME OVER!
         </h1>
         <h2 className="text-4xl font-bold text-white mb-8">
-          {winner?.name} Wins!
+          {winner.name} Wins!
         </h2>
         {state.gameType === 'x01' && (
           <div className="text-white mb-8">

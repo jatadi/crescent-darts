@@ -8,6 +8,12 @@ import { getPlayers } from '@/utils/db';
 import { Player, GameType } from '@/types/game';
 import { useGame } from '@/contexts/GameContext';
 
+interface PlayerSelectionProps {
+  players: Player[];
+  selectedPlayers: Player[];
+  onTogglePlayer: (player: Player) => void;
+}
+
 export default function NewGame() {
   const router = useRouter();
   const { dispatch } = useGame();
@@ -133,17 +139,11 @@ export default function NewGame() {
 
       <Card className="mb-6">
         <h2 className="text-xl font-semibold mb-4">Select Players</h2>
-        <div className="grid grid-cols-2 gap-4">
-          {players.map((player) => (
-            <Button
-              key={player.id}
-              variant={selectedPlayerIds.includes(player.id) ? 'primary' : 'secondary'}
-              onClick={() => togglePlayer(player.id)}
-            >
-              {player.name}
-            </Button>
-          ))}
-        </div>
+        <PlayerSelection
+          players={players}
+          selectedPlayers={players.filter(p => selectedPlayerIds.includes(p.id))}
+          onTogglePlayer={(player) => togglePlayer(player.id)}
+        />
       </Card>
 
       <Button 
@@ -154,6 +154,37 @@ export default function NewGame() {
       >
         Start Game
       </Button>
+    </div>
+  );
+}
+
+function PlayerSelection({ players, selectedPlayers, onTogglePlayer }: PlayerSelectionProps) {
+  return (
+    <div className="grid grid-cols-2 gap-4 mb-6">
+      {players.map((player) => (
+        <button
+          key={player.id}
+          onClick={() => onTogglePlayer(player)}
+          className={`flex items-center gap-3 p-4 rounded-lg border-2 transition-colors ${
+            selectedPlayers.includes(player) 
+              ? 'border-yellow-400 bg-yellow-50 dark:bg-yellow-900/20' 
+              : 'border-gray-200 hover:border-gray-300 dark:border-gray-700'
+          }`}
+        >
+          {player.photo_url ? (
+            <img 
+              src={player.photo_url} 
+              alt={player.name}
+              className="w-10 h-10 rounded-full object-cover"
+            />
+          ) : (
+            <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+              <span className="text-lg font-medium">{player.name[0]}</span>
+            </div>
+          )}
+          <span className="font-medium">{player.name}</span>
+        </button>
+      ))}
     </div>
   );
 } 
