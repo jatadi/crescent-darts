@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { createPlayer, getPlayers } from '@/utils/db';
+import { addPlayer, getPlayers } from '@/utils/db';
 import { Player } from '@/types/game';
 
 export default function TestPage() {
@@ -20,7 +20,7 @@ export default function TestPage() {
   async function handleAddPlayer(e: React.FormEvent) {
     e.preventDefault();
     if (newPlayerName.trim()) {
-      await createPlayer(newPlayerName);
+      await addPlayer(newPlayerName);
       setNewPlayerName('');
       loadPlayers();
     }

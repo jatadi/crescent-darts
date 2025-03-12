@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Player } from '@/types/game';
-import { createPlayer, getPlayers, deletePlayer } from '@/utils/db';
+import { addPlayer, getPlayers, deletePlayer } from '@/utils/db';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 import PlayerCard from '@/components/players/PlayerCard';
@@ -25,7 +25,7 @@ export default function PlayersPage() {
   async function handleAddPlayer(e: React.FormEvent) {
     e.preventDefault();
     if (newPlayerName.trim()) {
-      const player = await createPlayer(newPlayerName);
+      const player = await addPlayer(newPlayerName);
       if (player) {
         setPlayers([player, ...players]);
         setNewPlayerName('');

@@ -31,13 +31,24 @@ export default function MissAnimation() {
     // Play miss sound
     const missSound = new Audio('/sounds/miss.mp3');
     missSound.volume = 0.6;
-    missSound.play().catch(console.error);
+    
+    const playPromise = missSound.play();
+    if (playPromise !== undefined) {
+      playPromise.catch(error => {
+        if (error.name === 'AbortError') {
+          console.log('Sound play aborted - this is normal when navigating');
+        } else {
+          console.error('Error playing miss sound:', error);
+        }
+      });
+    }
 
     // Clean up particles and sounds after animation
     const timer = setTimeout(() => setParticles([]), 2000);
     return () => {
       clearTimeout(timer);
       missSound.pause();
+      missSound.src = '';
     };
   }, []);
 

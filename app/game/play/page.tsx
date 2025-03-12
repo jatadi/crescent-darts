@@ -6,7 +6,7 @@ import CricketLights from '@/components/game/CricketLights';
 import VictoryScreen from '@/components/game/VictoryScreen';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
-import { CricketPlayerState, GameState } from '@/types/game';
+import { CricketPlayerState, GameState, X01Settings, CricketSettings } from '@/types/game';
 
 const getPlayerAverage = (state: GameState, playerId: string) => {
   const stats = state.playerStats[playerId];
@@ -44,7 +44,7 @@ export default function GamePlay() {
           <div className="mb-6">
             <h1 className="text-3xl font-bold mb-4">
               {state.gameType === 'x01' ? 
-                `${state.settings.startingScore} Game` : 
+                `${(state.settings as X01Settings).startingScore} Game` : 
                 'Cricket'}
             </h1>
             <div className="grid grid-cols-3 gap-4 mb-6">
@@ -82,7 +82,7 @@ export default function GamePlay() {
           {state.gameType === 'cricket' && (
             <div className="text-center mb-4">
               <div className="text-xl font-bold">
-                Round {state.currentRound} / {state.settings.rounds}
+                Round {state.currentRound} / {(state.settings as CricketSettings).rounds}
               </div>
             </div>
           )}

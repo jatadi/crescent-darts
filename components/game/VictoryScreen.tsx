@@ -24,10 +24,23 @@ export default function VictoryScreen() {
 
     const victorySound = new Audio('/sounds/victory.mp3');
     victorySound.volume = 0.5;
-    victorySound.play().catch(console.error);
+    
+    // Add error handling for the play promise
+    const playPromise = victorySound.play();
+    if (playPromise !== undefined) {
+      playPromise.catch(error => {
+        if (error.name === 'AbortError') {
+          // Ignore abort errors - these are expected when navigating away
+          console.log('Sound play aborted - this is normal when navigating');
+        } else {
+          console.error('Error playing victory sound:', error);
+        }
+      });
+    }
 
     return () => {
       victorySound.pause();
+      victorySound.src = ''; // Clear the source
     };
   }, []);
 

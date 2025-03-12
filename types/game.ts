@@ -4,14 +4,14 @@ export type GameType = 'x01' | 'cricket';
 export interface Player {
   id: string;
   name: string;
-  photoUrl?: string;
+  photo_url?: string;
   createdAt: Date;
 }
 
 // X01 specific types
 export interface X01Settings {
   startingScore: number;
-  doubleOut?: boolean;
+  doubleOut: boolean;
 }
 
 export interface X01PlayerState {
@@ -46,13 +46,14 @@ export interface CricketPlayerState {
 // Game state types
 export type GameState = {
   gameType: GameType;
-  gameOver: boolean;
-  winnerId?: string;
+  settings: GameSettings;
+  players: (X01PlayerState | CricketPlayerState)[];
   currentTurn: {
     playerId: string;
     dartsThrown: number;
     scores: number[];
   };
+  gameOver: boolean;
   turns: {
     playerId: string;
     scores: number[];
@@ -63,20 +64,10 @@ export type GameState = {
       dartsThrown: number;
     };
   };
-  maxRounds?: number;
   currentRound: number;
-} & (
-  | {
-      gameType: 'x01';
-      settings: X01Settings;
-      players: X01PlayerState[];
-    }
-  | {
-      gameType: 'cricket';
-      settings: CricketSettings;
-      players: CricketPlayerState[];
-    }
-);
+  maxRounds?: number;
+  winnerId?: string;
+};
 
 // Add this to your existing types/game.ts
 export type GameSettings = X01Settings | CricketSettings; 

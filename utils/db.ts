@@ -1,11 +1,35 @@
 import { supabase } from './supabase';
-import { Player } from '@/types/game';
-import { GameState } from '@/contexts/GameContext';
+import { Player, GameState, X01Settings } from '@/types/game';
+import { createClient } from '@supabase/supabase-js';
 
-export async function createPlayer(name: string, photoUrl?: string): Promise<Player | null> {
+const supabaseClient = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
+
+export async function addPlayer(name: string, photoBlob?: Blob | null): Promise<Player | null> {
+  let photoUrl;
+  if (photoBlob) {
+    // First create player to get ID
+    const { data: player, error } = await supabase
+      .from('players')
+      .insert([{ name }])
+      .select()
+      .single();
+
+    if (error || !player) {
+      console.error('Error creating player:', error);
+      return null;
+    }
+
+    // Then upload photo and update player
+    photoUrl = await uploadPlayerPhoto(player.id, photoBlob);
+  }
+
+  // Create player without photo or update existing player with photo
   const { data, error } = await supabase
     .from('players')
-    .insert([
+    .upsert([
       { name, photo_url: photoUrl }
     ])
     .select()
@@ -22,7 +46,7 @@ export async function createPlayer(name: string, photoUrl?: string): Promise<Pla
 export async function getPlayers(): Promise<Player[]> {
   const { data, error } = await supabase
     .from('players')
-    .select('*')
+    .select('id, name, photo_url, created_at')
     .order('created_at', { ascending: false });
 
   if (error) {
@@ -30,7 +54,11 @@ export async function getPlayers(): Promise<Player[]> {
     return [];
   }
 
-  return data as Player[];
+  return data.map(player => ({
+    ...player,
+    photoUrl: player.photo_url,
+    createdAt: new Date(player.created_at)
+  })) as Player[];
 }
 
 export async function deletePlayer(id: string): Promise<boolean> {
@@ -54,7 +82,8 @@ export async function saveGameHistory(gameState: GameState): Promise<boolean> {
       .from('games')
       .insert({
         game_type: gameState.gameType,
-        starting_score: gameState.settings.startingScore,
+        starting_score: gameState.gameType === 'x01' ? 
+          (gameState.settings as X01Settings).startingScore : null,
         winner_id: gameState.winnerId,
         settings: gameState.settings
       })
@@ -133,4 +162,45 @@ export async function getGameHistory() {
   }
 
   return data;
+}
+
+export async function uploadPlayerPhoto(playerId: string, photoBlob: Blob): Promise<string | null> {
+  try {
+    // Create a unique filename
+    const fileName = `${playerId}-${Date.now()}.jpg`;
+    
+    // Upload to Supabase storage
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('player-photos')  // Make sure this bucket exists in Supabase
+      .upload(fileName, photoBlob, {
+        contentType: 'image/jpeg',
+        upsert: true
+      });
+
+    if (uploadError) {
+      console.error('Error uploading to storage:', uploadError);
+      return null;
+    }
+
+    // Get the public URL
+    const { data: { publicUrl } } = supabase.storage
+      .from('player-photos')
+      .getPublicUrl(fileName);
+
+    // Update player record with photo URL
+    const { error: updateError } = await supabase
+      .from('players')
+      .update({ photo_url: publicUrl })
+      .eq('id', playerId);
+
+    if (updateError) {
+      console.error('Error updating player photo URL:', updateError);
+      return null;
+    }
+
+    return publicUrl;
+  } catch (error) {
+    console.error('Error in uploadPlayerPhoto:', error);
+    return null;
+  }
 } 

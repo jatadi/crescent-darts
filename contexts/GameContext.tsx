@@ -4,12 +4,12 @@ import { createContext, useContext, useReducer } from 'react';
 import { 
   Player, 
   GameType, 
-  GameSettings, 
-  GameState, 
+  GameSettings,
   X01Settings, 
   CricketSettings,
   X01PlayerState,
-  CricketPlayerState 
+  CricketPlayerState,
+  GameState
 } from '@/types/game';
 import { saveGameHistory } from '@/utils/db';
 
@@ -125,7 +125,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
       // Handle bust conditions
       if (newScore < 0 || newScore === 1 || 
-          (state.settings.doubleOut && newScore === 0 && action.baseScore * 2 !== action.score)) {
+          (state.gameType === 'x01' && (state.settings as X01Settings).doubleOut && 
+           newScore === 0 && action.baseScore * 2 !== action.score)) {
         const currentPlayerIndex = state.players.findIndex(p => p.current);
         const nextPlayerIndex = (currentPlayerIndex + 1) % state.players.length;
 
@@ -278,7 +279,7 @@ function handleCricketScore(state: GameState, action: { score: number; baseScore
 
   const currentTurn = state.currentTurn;
   const dartsThrown = currentTurn.dartsThrown + 1;
-  const currentPlayer = state.players.find(p => p.id === currentTurn.playerId)!;
+  const currentPlayer = state.players.find(p => p.id === currentTurn.playerId)! as CricketPlayerState;
   const newScores = [...currentTurn.scores, action.score];
 
   // Determine which number was hit
@@ -306,20 +307,19 @@ function handleCricketScore(state: GameState, action: { score: number; baseScore
   // Update the cricket scores for all players
   let updatedPlayers = state.players.map(player => {
     if (player.id === currentTurn.playerId) {
-      // Update current player
       return {
-        ...player,
+        ...(player as CricketPlayerState),
         cricketScores: {
-          ...player.cricketScores,
+          ...(player as CricketPlayerState).cricketScores,
           [key]: {
-            marks: Math.min(newMarks, 3),  // Cap at 3 marks
+            marks: Math.min(newMarks, 3),
             closed: newMarks >= 3
           }
         },
-        score: player.score  // Score will be updated below if needed
+        score: player.score
       };
     }
-    return player;
+    return player as CricketPlayerState;
   }) as CricketPlayerState[];
 
   // Calculate and apply points immediately if overflow
@@ -336,7 +336,9 @@ function handleCricketScore(state: GameState, action: { score: number; baseScore
   // Check for game end conditions
   const isGameOver = () => {
     // End if max rounds reached
-    if (state.currentRound >= state.settings.rounds) return true;
+    if (state.gameType === 'cricket' && state.currentRound >= (state.settings as CricketSettings).rounds) {
+      return true;
+    }
 
     // End if a player has closed all numbers and has lowest score
     const allNumbersClosed = (player: CricketPlayerState) => 
