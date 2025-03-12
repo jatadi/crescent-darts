@@ -83,7 +83,8 @@ export async function saveGameHistory(gameState: GameState): Promise<boolean> {
       .insert({
         game_type: gameState.gameType,
         starting_score: gameState.gameType === 'x01' ? 
-          (gameState.settings as X01Settings).startingScore : null,
+          (gameState.settings as X01Settings).startingScore : 
+          null,  // Explicitly set null for cricket games
         winner_id: gameState.winnerId,
         settings: gameState.settings
       })

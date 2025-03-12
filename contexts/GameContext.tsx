@@ -274,7 +274,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 }
 
 // Helper function for cricket scoring
-function handleCricketScore(state: GameState, action: { score: number; baseScore: number }) {
+function handleCricketScore(state: GameState, action: { type: 'ADD_SCORE'; score: number; baseScore: number }): GameState {
   if (state.gameType !== 'cricket') return state;
 
   const currentTurn = state.currentTurn;
