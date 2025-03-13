@@ -84,7 +84,11 @@ export default function ScoreInput() {
     const score = baseScore * multiplier;
 
     // Play sound if it's a double or triple
-    if (multiplier === 2) playSound('double');
+    if (multiplier === 2) {
+      const sound = new Audio('/sounds/double.mp3');
+      sound.volume = 0.75; // 1.5x the default volume of 0.5
+      sound.play().catch(console.error);
+    }
     else if (multiplier === 3) playSound('triple');
     
     // Dispatch score and reset multiplier

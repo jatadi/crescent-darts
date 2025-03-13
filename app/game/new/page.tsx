@@ -21,7 +21,7 @@ export default function NewGame() {
   const [settings, setSettings] = useState({
     startingScore: 501,
     doubleOut: false,
-    rounds: 15 as 15 | 20
+    rounds: 15 as 15 | 20 | 25
   });
   const [players, setPlayers] = useState<Player[]>([]);
   const [selectedPlayers, setSelectedPlayers] = useState<Player[]>([]);
@@ -92,11 +92,12 @@ export default function NewGame() {
         {gameType === 'x01' ? (
           <div className="space-y-4">
             <div>
-              <label className="block mb-2">Starting Score</label>
+              <label className="block mb-2 text-lg font-medium text-gray-900 dark:text-white">Starting Score</label>
               <select
                 value={settings.startingScore}
                 onChange={(e) => setSettings({ ...settings, startingScore: Number(e.target.value) })}
-                className="w-full p-2 border rounded"
+                className="w-full p-3 text-xl bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg 
+                text-blue-900 dark:text-blue-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
                 <option value={301}>301</option>
                 <option value={501}>501</option>
@@ -116,24 +117,25 @@ export default function NewGame() {
             </div>
           </div>
         ) : (
-          <div className="mb-4">
-            <label className="block mb-2 text-lg font-medium text-gray-900 dark:text-white">
-              Number of Rounds
-            </label>
-            <input
-              type="number"
-              value={settings.rounds}
-              onChange={(e) => {
-                const value = parseInt(e.target.value);
-                const validRounds = value <= 15 ? 15 : 20;
-                setSettings({ ...settings, rounds: validRounds });
-              }}
-              min={15}
-              max={20}
-              step={5}
-              className="w-full p-3 text-xl bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg 
-              text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            />
+          <div className="space-y-4">
+            <div>
+              <label className="block mb-2 text-lg font-medium text-gray-900 dark:text-white">
+                Number of Rounds
+              </label>
+              <div className="space-y-2">
+                {[15, 20, 25].map((roundOption) => (
+                  <label key={roundOption} className="flex items-center">
+                    <input
+                      type="radio"
+                      checked={settings.rounds === roundOption}
+                      onChange={() => setSettings({ ...settings, rounds: roundOption as 15 | 20 | 25 })}
+                      className="mr-2"
+                    />
+                    {roundOption} Rounds
+                  </label>
+                ))}
+              </div>
+            </div>
           </div>
         )}
       </div>

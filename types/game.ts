@@ -28,7 +28,7 @@ export interface X01PlayerState {
 
 // Cricket specific types
 export interface CricketSettings {
-  rounds: 15 | 20;
+  rounds: 15 | 20 | 25;
 }
 
 export interface CricketPlayerState {
