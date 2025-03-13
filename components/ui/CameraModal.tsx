@@ -36,6 +36,15 @@ export default function CameraModal({ onCapture, onSkip, onClose }: CameraModalP
     };
   }, []);
 
+  useEffect(() => {
+    if (videoRef.current && stream) {
+      videoRef.current.srcObject = stream;
+    }
+    return () => {
+      stream?.getTracks().forEach(track => track.stop());
+    };
+  }, [stream]);
+
   const startCamera = async () => {
     try {
       // First try the environment camera (back camera on phones)
