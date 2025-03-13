@@ -17,7 +17,8 @@ type GameAction =
   | { type: 'ADD_SCORE'; score: number; baseScore: number }
   | { type: 'UNDO_SCORE' }
   | { type: 'NEXT_PLAYER' }
-  | { type: 'START_GAME'; players: Player[]; gameType: GameType; settings: GameSettings };
+  | { type: 'START_GAME'; players: Player[]; gameType: GameType; settings: GameSettings }
+  | { type: 'ADJUST_SCORE'; playerId: string; newScore: number };
 
 const GameContext = createContext<{
   state: GameState;
@@ -213,59 +214,109 @@ function gameReducer(state: GameState, action: GameAction): GameState {
     case 'NEXT_PLAYER': {
       const currentPlayerIndex = state.players.findIndex(p => p.current);
       const nextPlayerIndex = (currentPlayerIndex + 1) % state.players.length;
+      
+      // Increment round when we've gone through all players
+      const nextRound = nextPlayerIndex === 0 ? 
+        state.currentRound + 1 : 
+        state.currentRound;
 
-      if (state.gameType === 'x01') {
-        return {
-          ...state,
-          players: (state.players as X01PlayerState[]).map((player, index) => ({
-            ...player,
-            current: index === nextPlayerIndex,
-          })),
-          currentTurn: {
-            playerId: state.players[nextPlayerIndex].id,
-            dartsThrown: 0,
-            scores: [],
-          },
-        } as GameState;
-      } else {
-        return {
-          ...state,
-          players: (state.players as CricketPlayerState[]).map((player, index) => ({
-            ...player,
-            current: index === nextPlayerIndex,
-          })),
-          currentTurn: {
-            playerId: state.players[nextPlayerIndex].id,
-            dartsThrown: 0,
-            scores: [],
-          },
-        } as GameState;
-      }
+      // Check if game should end (in cricket)
+      const gameOver = state.gameType === 'cricket' && 
+        nextRound > (state.settings as CricketSettings).rounds;
+
+      return {
+        ...state,
+        currentRound: nextRound,
+        gameOver,
+        players: state.players.map((player, index) => ({
+          ...player,
+          current: gameOver ? false : index === nextPlayerIndex,
+        })),
+        currentTurn: {
+          playerId: state.players[nextPlayerIndex].id,
+          dartsThrown: 0,
+          scores: [],
+        },
+      } as GameState;
     }
 
     case 'UNDO_SCORE': {
       if (state.currentTurn.scores.length === 0) return state;
 
-      const lastScore = state.currentTurn.scores[state.currentTurn.scores.length - 1];
-      const players = state.gameType === 'x01' ?
-        (state.players as X01PlayerState[]).map(player => ({
-          ...player,
-          score: player.id === state.currentTurn.playerId ? player.score + lastScore : player.score
-        })) :
-        (state.players as CricketPlayerState[]).map(player => ({
-          ...player,
-          score: player.id === state.currentTurn.playerId ? player.score + lastScore : player.score
-        }));
+      if (state.gameType === 'cricket') {
+        const lastScore = state.currentTurn.scores[state.currentTurn.scores.length - 1];
+        const marksHit = lastScore === 50 ? 2 : Math.ceil(lastScore / 25);
+        const lastBaseScore = lastScore / marksHit;
+        const key = lastBaseScore === 25 ? 'bull' : lastBaseScore.toString();
+        
+        const currentPlayer = state.players.find(p => p.id === state.currentTurn.playerId) as CricketPlayerState;
+        const previousMarks = currentPlayer.cricketScores[key].marks;
+        const newMarks = previousMarks - marksHit;
+        
+        // Calculate if this shot caused overflow points
+        const hadOverflowBefore = previousMarks > 3;
+        const causedOverflow = previousMarks <= 3 && newMarks + marksHit > 3;
+        const overflowPoints = causedOverflow ? lastBaseScore : 0;
 
+        // Update players
+        const updatedPlayers = state.players.map(player => {
+          if (player.id === state.currentTurn.playerId) {
+            return {
+              ...player,
+              cricketScores: {
+                ...(player as CricketPlayerState).cricketScores,
+                [key]: {
+                  marks: newMarks,
+                  closed: newMarks >= 3
+                }
+              }
+            } as CricketPlayerState;
+          } else if (causedOverflow && 'cricketScores' in player && !player.cricketScores[key].closed) {
+            // Only revert points if this shot caused the overflow
+            return {
+              ...player,
+              score: player.score - overflowPoints
+            } as CricketPlayerState;
+          }
+          return player;
+        }) as CricketPlayerState[];
+
+        return {
+          ...state,
+          players: updatedPlayers,
+          currentTurn: {
+            ...state.currentTurn,
+            dartsThrown: state.currentTurn.dartsThrown - 1,
+            scores: state.currentTurn.scores.slice(0, -1),
+          },
+        };
+      }
+
+      // Handle X01 undo as before
+      const lastScore = state.currentTurn.scores[state.currentTurn.scores.length - 1];
       return {
         ...state,
-        players,
+        players: (state.players as X01PlayerState[]).map(player => ({
+          ...player,
+          score: player.id === state.currentTurn.playerId ? player.score + lastScore : player.score
+        })),
         currentTurn: {
           ...state.currentTurn,
           dartsThrown: state.currentTurn.dartsThrown - 1,
           scores: state.currentTurn.scores.slice(0, -1),
         },
-      } as GameState;
+      };
+    }
+
+    case 'ADJUST_SCORE': {
+      return {
+        ...state,
+        players: state.players.map(player => 
+          player.id === action.playerId 
+            ? { ...player, score: action.newScore }
+            : player
+        ),
+      };
     }
 
     default:
@@ -279,93 +330,96 @@ function handleCricketScore(state: GameState, action: { type: 'ADD_SCORE'; score
 
   const currentTurn = state.currentTurn;
   const dartsThrown = currentTurn.dartsThrown + 1;
-  const currentPlayer = state.players.find(p => p.id === currentTurn.playerId)! as CricketPlayerState;
   const newScores = [...currentTurn.scores, action.score];
 
-  // Determine which number was hit
-  const key = action.baseScore === 25 || action.baseScore === 50 ? 'bull' : action.baseScore.toString();
-  
-  // Return early if not a valid cricket number
-  if (!['15', '16', '17', '18', '19', '20', 'bull'].includes(key)) {
-    return {
-      ...state,
-      currentTurn: {
-        ...currentTurn,
-        dartsThrown,
-        scores: newScores,
-      },
-    };
-  }
+  // Update players with new scores only if it's a valid cricket number
+  let updatedPlayers = state.players;
+  if (['15', '16', '17', '18', '19', '20', 'bull'].includes(
+    action.baseScore === 25 || action.baseScore === 50 ? 'bull' : action.baseScore.toString()
+  )) {
+    const currentPlayer = state.players.find(p => p.id === currentTurn.playerId) as CricketPlayerState;
+    const key = action.baseScore === 25 || action.baseScore === 50 ? 'bull' : action.baseScore.toString();
+    
+    const marksToAdd = action.baseScore === 50 ? 2 : action.score / action.baseScore;
 
-  const marksToAdd = action.baseScore === 50 ? 2 : action.score / action.baseScore;
+    // Update players with new scores
+    updatedPlayers = state.players.map(player => {
+      if (player.id === currentTurn.playerId) {
+        const cricketPlayer = player as CricketPlayerState;
+        const currentMarks = cricketPlayer.cricketScores[key].marks;
+        const newMarks = Math.min(currentMarks + marksToAdd, 3);
+        const overflowMarks = Math.max(0, currentMarks + marksToAdd - 3);
 
-  // Calculate new marks for the hit number
-  const currentMarks = currentPlayer.cricketScores[key].marks;
-  const newMarks = currentMarks + marksToAdd;
-  const overflowMarks = Math.max(0, newMarks - 3);  // Calculate overflow marks
-
-  // Update the cricket scores for all players
-  let updatedPlayers = state.players.map(player => {
-    if (player.id === currentTurn.playerId) {
-      return {
-        ...(player as CricketPlayerState),
-        cricketScores: {
-          ...(player as CricketPlayerState).cricketScores,
-          [key]: {
-            marks: Math.min(newMarks, 3),
-            closed: newMarks >= 3
+        return {
+          ...cricketPlayer,
+          cricketScores: {
+            ...cricketPlayer.cricketScores,
+            [key]: {
+              marks: newMarks,
+              closed: newMarks >= 3
+            }
           }
-        },
-        score: player.score
-      };
-    }
-    return player as CricketPlayerState;
-  }) as CricketPlayerState[];
+        };
+      }
+      return player as CricketPlayerState;
+    }) as CricketPlayerState[];
 
-  // Calculate and apply points immediately if overflow
-  if (overflowMarks > 0 && !isNumberClosedByOthers(key, updatedPlayers, currentTurn.playerId)) {
-    const pointsToAdd = overflowMarks * action.baseScore;
-    updatedPlayers = updatedPlayers.map(player => ({
-      ...player,
-      // Add points to opponents who haven't closed the number
-      score: (player.id !== currentTurn.playerId && !player.cricketScores[key].closed) ? 
-        player.score + pointsToAdd : player.score
-    }));
+    // Calculate and apply points for overflow marks
+    if (marksToAdd > 0) {
+      const currentMarks = (currentPlayer as CricketPlayerState).cricketScores[key].marks;
+      const newMarks = currentMarks + marksToAdd;
+      
+      // Calculate how many marks exceed 3 (overflow)
+      const overflowMarks = Math.max(0, newMarks - 3);
+      
+      // Only add points if there are overflow marks (marks beyond 3)
+      if (overflowMarks > 0) {
+        const pointsToAdd = action.baseScore * overflowMarks;
+        // Add points to players who haven't closed the number
+        updatedPlayers = updatedPlayers.map(p => ({
+          ...p,
+          score: p.id !== currentTurn.playerId && 'cricketScores' in p && !p.cricketScores[key].closed ? 
+            p.score + pointsToAdd : p.score
+        }));
+      }
+    }
   }
 
-  // Check for game end conditions
-  const isGameOver = () => {
-    // End if max rounds reached
-    if (state.gameType === 'cricket' && state.currentRound >= (state.settings as CricketSettings).rounds) {
-      return true;
-    }
-
-    // End if a player has closed all numbers and has lowest score
-    const allNumbersClosed = (player: CricketPlayerState) => 
-      Object.values(player.cricketScores).every(score => score.closed);
-
-    const lowestScore = Math.min(...updatedPlayers.map(p => p.score));
-    const winner = updatedPlayers.find(p => 
-      allNumbersClosed(p as CricketPlayerState) && p.score === lowestScore
-    );
-
-    return !!winner;
-  };
-
-  // Auto switch after 3 darts
+  // Auto switch after 3 darts (moved outside the valid number check)
   if (dartsThrown === 3) {
     const currentPlayerIndex = state.players.findIndex(p => p.current);
     const nextPlayerIndex = (currentPlayerIndex + 1) % state.players.length;
-    const nextRound = currentPlayerIndex === state.players.length - 1 ? 
-      state.currentRound + 1 : state.currentRound;
+    
+    const nextRound = nextPlayerIndex === 0 ? 
+      state.currentRound + 1 : 
+      state.currentRound;
 
-    const gameOver = isGameOver();
+    // Check if game is over (max rounds reached or all numbers closed)
+    const isGameOver = () => {
+      if (state.gameType !== 'cricket') return false;
+      
+      const allNumbersClosed = (player: CricketPlayerState | X01PlayerState): boolean => {
+        if ('cricketScores' in player) {
+          return Object.values(player.cricketScores).every(score => score.closed);
+        }
+        return false;
+      };
+
+      const lowestScore = Math.min(...updatedPlayers.map(p => p.score));
+      const winner = updatedPlayers.find(p => 
+        allNumbersClosed(p) && p.score === lowestScore
+      );
+
+      return !!winner;
+    };
+
+    const gameOver = nextRound > (state.settings as CricketSettings).rounds || isGameOver();
     const winnerId = gameOver ? 
       updatedPlayers.reduce((lowest, p) => 
         p.score < lowest.score ? p : lowest
       ).id : undefined;
 
-    const finalState = {
+    return {
       ...state,
       currentRound: nextRound,
       gameOver,
@@ -381,14 +435,9 @@ function handleCricketScore(state: GameState, action: { type: 'ADD_SCORE'; score
       },
       turns: [...state.turns, { playerId: currentTurn.playerId, scores: newScores }],
     };
-
-    if (gameOver) {
-      saveGameHistory(finalState).catch(console.error);
-    }
-
-    return finalState;
   }
 
+  // Continue current player's turn
   return {
     ...state,
     players: updatedPlayers,

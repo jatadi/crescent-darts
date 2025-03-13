@@ -10,8 +10,8 @@ import { useGame } from '@/contexts/GameContext';
 
 interface PlayerSelectionProps {
   players: Player[];
-  selectedPlayerIds: string[];
-  onTogglePlayer: (playerId: string) => void;
+  selectedPlayers: Player[];
+  onTogglePlayer: (player: Player) => void;
 }
 
 export default function NewGame() {
@@ -24,7 +24,7 @@ export default function NewGame() {
     rounds: 15 as 15 | 20
   });
   const [players, setPlayers] = useState<Player[]>([]);
-  const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
+  const [selectedPlayers, setSelectedPlayers] = useState<Player[]>([]);
 
   useEffect(() => {
     loadPlayers();
@@ -35,23 +35,21 @@ export default function NewGame() {
     setPlayers(playerList);
   }
 
-  function togglePlayer(playerId: string) {
-    setSelectedPlayerIds(current => {
-      if (current.includes(playerId)) {
-        return current.filter(id => id !== playerId);
+  function togglePlayer(player: Player) {
+    setSelectedPlayers(current => {
+      if (current.includes(player)) {
+        return current.filter(p => p.id !== player.id);
       }
-      return [...current, playerId];
+      return [...current, player];
     });
   }
 
   function handleStartGame() {
-    if (selectedPlayerIds.length < 2) {
+    if (selectedPlayers.length < 2) {
       alert('Please select at least 2 players');
       return;
     }
 
-    const selectedPlayers = players.filter(p => selectedPlayerIds.includes(p.id));
-    
     dispatch({
       type: 'START_GAME',
       players: selectedPlayers,
@@ -118,20 +116,24 @@ export default function NewGame() {
             </div>
           </div>
         ) : (
-          <div>
-            <label className="block mb-2">Number of Rounds</label>
-            <select
+          <div className="mb-4">
+            <label className="block mb-2 text-lg font-medium text-gray-900 dark:text-white">
+              Number of Rounds
+            </label>
+            <input
+              type="number"
               value={settings.rounds}
-              onChange={(e) => setSettings({ 
-                ...settings, 
-                rounds: Number(e.target.value) as 15 | 20 
-              })}
-              className="w-full p-2 border rounded"
-            >
-              <option value={15}>15 Rounds</option>
-              <option value={20}>20 Rounds</option>
-              <option value={25}>25 Rounds</option>
-            </select>
+              onChange={(e) => {
+                const value = parseInt(e.target.value);
+                const validRounds = value <= 15 ? 15 : 20;
+                setSettings({ ...settings, rounds: validRounds });
+              }}
+              min={15}
+              max={20}
+              step={5}
+              className="w-full p-3 text-xl bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg 
+              text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
           </div>
         )}
       </div>
@@ -140,8 +142,8 @@ export default function NewGame() {
         <h2 className="text-xl font-semibold mb-4">Select Players</h2>
         <PlayerSelection
           players={players}
-          selectedPlayerIds={selectedPlayerIds}
-          onTogglePlayer={(playerId) => togglePlayer(playerId)}
+          selectedPlayers={selectedPlayers}
+          onTogglePlayer={(player) => togglePlayer(player)}
         />
       </Card>
 
@@ -149,7 +151,7 @@ export default function NewGame() {
         size="lg" 
         className="w-full"
         onClick={handleStartGame}
-        disabled={selectedPlayerIds.length < 2}
+        disabled={selectedPlayers.length < 2}
       >
         Start Game
       </Button>
@@ -157,15 +159,15 @@ export default function NewGame() {
   );
 }
 
-function PlayerSelection({ players, selectedPlayerIds, onTogglePlayer }: PlayerSelectionProps) {
+function PlayerSelection({ players, selectedPlayers, onTogglePlayer }: PlayerSelectionProps) {
   return (
     <div className="grid grid-cols-2 gap-4 mb-6">
       {players.map((player) => (
         <button
           key={player.id}
-          onClick={() => onTogglePlayer(player.id)}
+          onClick={() => onTogglePlayer(player)}
           className={`flex items-center gap-3 p-4 rounded-lg border-2 transition-colors ${
-            selectedPlayerIds.includes(player.id) 
+            selectedPlayers.includes(player) 
               ? 'border-yellow-400 bg-yellow-50 dark:bg-yellow-900/20' 
               : 'border-gray-200 hover:border-gray-300 dark:border-gray-700'
           }`}

@@ -5,10 +5,61 @@ import Button from '@/components/ui/Button';
 import { useGame } from '@/contexts/GameContext';
 import MissAnimation from './MissAnimation';
 
+interface ScoreAdjustModalProps {
+  playerId: string;
+  onClose: () => void;
+}
+
+function ScoreAdjustModal({ playerId, onClose }: ScoreAdjustModalProps) {
+  const { state, dispatch } = useGame();
+  const player = state.players.find(p => p.id === playerId)!;
+  const [newScore, setNewScore] = useState(player.score.toString());
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    dispatch({ 
+      type: 'ADJUST_SCORE', 
+      playerId, 
+      newScore: parseInt(newScore) 
+    });
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <form onSubmit={handleSubmit} className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl">
+        <input
+          type="number"
+          value={newScore}
+          onChange={(e) => setNewScore(e.target.value)}
+          className="border p-2 rounded w-full text-xl dark:bg-gray-700 dark:text-white dark:border-gray-600"
+        />
+        <div className="flex gap-2 mt-4">
+          <button 
+            type="button" 
+            onClick={onClose} 
+            className="flex-1 px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded transition-colors"
+          >
+            Cancel
+          </button>
+          <button 
+            type="submit" 
+            className="flex-1 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded transition-colors"
+          >
+            Save
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 export default function ScoreInput() {
   const { state, dispatch } = useGame();
   const [multiplier, setMultiplier] = useState<1 | 2 | 3>(1);
   const [showMissAnimation, setShowMissAnimation] = useState(false);
+  const [showScoreAdjust, setShowScoreAdjust] = useState(false);
+  const currentPlayer = state.players.find(p => p.current)!;
 
   const playSound = useCallback((type: 'single' | 'double' | 'triple') => {
     const sound = new Audio(`/sounds/${type}.mp3`);
@@ -42,8 +93,13 @@ export default function ScoreInput() {
   };
 
   const handleMiss = (isWallMiss = false) => {
-    dispatch({ type: 'ADD_SCORE', score: 0, baseScore: 0 });
-    setMultiplier(1);
+    // Add score of 0 but increment darts thrown
+    dispatch({ 
+      type: 'ADD_SCORE', 
+      score: 0, 
+      baseScore: 0 
+    });
+
     if (isWallMiss) {
       setShowMissAnimation(true);
       setTimeout(() => setShowMissAnimation(false), 2000);
@@ -106,6 +162,13 @@ export default function ScoreInput() {
 
             <div className="grid grid-cols-2 gap-2 mt-4">
               <Button
+                onClick={() => handleMiss(false)}
+                disabled={state.gameOver}
+                className="col-span-2"
+              >
+                Miss
+              </Button>
+              <Button
                 variant="secondary"
                 onClick={() => dispatch({ type: 'UNDO_SCORE' })}
                 disabled={state.currentTurn.scores.length === 0}
@@ -113,17 +176,10 @@ export default function ScoreInput() {
                 Undo
               </Button>
               <Button
-                onClick={() => handleMiss(false)}
-                disabled={state.gameOver}
+                variant="secondary"
+                onClick={() => setShowScoreAdjust(true)}
               >
-                Miss
-              </Button>
-              <Button
-                onClick={() => dispatch({ type: 'NEXT_PLAYER' })}
-                disabled={state.currentTurn.dartsThrown === 0}
-                className="col-span-2"
-              >
-                Next Player
+                Adjust Score
               </Button>
             </div>
           </div>
@@ -136,6 +192,13 @@ export default function ScoreInput() {
             Missed whole FUCKING wall
           </button>
         </div>
+
+        {showScoreAdjust && (
+          <ScoreAdjustModal
+            playerId={currentPlayer.id}
+            onClose={() => setShowScoreAdjust(false)}
+          />
+        )}
       </>
     );
   }
@@ -206,6 +269,13 @@ export default function ScoreInput() {
 
           <div className="grid grid-cols-2 gap-2 mt-4">
             <Button
+              onClick={() => handleMiss(false)}
+              disabled={state.gameOver}
+              className="col-span-2"
+            >
+              Miss
+            </Button>
+            <Button
               variant="secondary"
               onClick={() => dispatch({ type: 'UNDO_SCORE' })}
               disabled={state.currentTurn.scores.length === 0}
@@ -213,17 +283,10 @@ export default function ScoreInput() {
               Undo
             </Button>
             <Button
-              onClick={() => handleMiss(false)}
-              disabled={state.gameOver}
+              variant="secondary"
+              onClick={() => setShowScoreAdjust(true)}
             >
-              Miss
-            </Button>
-            <Button
-              onClick={() => dispatch({ type: 'NEXT_PLAYER' })}
-              disabled={state.currentTurn.dartsThrown === 0}
-              className="col-span-2"
-            >
-              Next Player
+              Adjust Score
             </Button>
           </div>
         </div>
@@ -236,6 +299,13 @@ export default function ScoreInput() {
           Missed whole FUCKING wall
         </button>
       </div>
+
+      {showScoreAdjust && (
+        <ScoreAdjustModal
+          playerId={currentPlayer.id}
+          onClose={() => setShowScoreAdjust(false)}
+        />
+      )}
     </>
   );
 } 
