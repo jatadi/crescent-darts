@@ -9,15 +9,18 @@ import { Player } from '@/types/game';
 interface GameHistory {
   id: string;
   game_type: 'x01' | 'cricket';
-  winner: Player;
+  winner: Player | null;
   created_at: string;
   starting_score: number | null;
+  settings: any;
   game_players: {
     player: Player;
     player_id: string;
     final_score: number;
     total_score: number;
     darts_thrown: number;
+    targets_hit?: number;
+    cricket_scores?: any;
   }[];
 }
 
@@ -30,8 +33,35 @@ export default function GameHistory() {
 
   async function loadGames() {
     const history = await getGameHistory();
+    console.log('History data received:', history);
     setGames(history);
   }
+
+  const renderPlayerStats = (game: GameHistory, gp: GameHistory['game_players'][0]) => {
+    if (game.game_type === 'cricket') {
+      // Calculate targets per dart using total_score for now since targets_hit isn't available
+      const targetsPerDart = gp.darts_thrown > 0 ? 
+        ((gp.total_score || 0) / gp.darts_thrown).toFixed(2) : 
+        '0.00';
+      return (
+        <>
+          <p className="text-sm">Final Score: {gp.final_score}</p>
+          <p className="text-sm">
+            Targets/Dart: {targetsPerDart}
+          </p>
+        </>
+      );
+    } else {
+      return (
+        <>
+          <p className="text-sm">Final Score: {gp.final_score}</p>
+          <p className="text-sm">
+            Avg: {(gp.total_score / gp.darts_thrown).toFixed(1)}
+          </p>
+        </>
+      );
+    }
+  };
 
   return (
     <div className="max-w-4xl mx-auto p-4">
@@ -53,13 +83,10 @@ export default function GameHistory() {
                     {game.game_players.map((gp) => (
                       <div 
                         key={gp.player_id}
-                        className={`p-2 rounded ${gp.player_id === game.winner.id ? 'bg-green-100 dark:bg-green-900' : ''}`}
+                        className={`p-2 rounded ${gp.player_id === game.winner?.id ? 'bg-green-100 dark:bg-green-900' : ''}`}
                       >
                         <p className="font-medium">{gp.player.name}</p>
-                        <p className="text-sm">Final Score: {gp.final_score}</p>
-                        <p className="text-sm">
-                          Avg: {(gp.total_score / gp.darts_thrown).toFixed(1)}
-                        </p>
+                        {renderPlayerStats(game, gp)}
                       </div>
                     ))}
                   </div>

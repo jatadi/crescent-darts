@@ -12,7 +12,9 @@ import Image from 'next/image';
 const getPlayerAverage = (state: GameState, playerId: string) => {
   const stats = state.playerStats[playerId];
   if (!stats || stats.dartsThrown === 0) return 0;
-  return (stats.totalScore / stats.dartsThrown).toFixed(1);
+  return state.gameType === 'cricket' ?
+    ((stats.targetsHit || 0) / stats.dartsThrown).toFixed(2) :
+    (stats.totalScore / stats.dartsThrown).toFixed(1);
 };
 
 export default function GamePlay() {
@@ -71,11 +73,11 @@ export default function GamePlay() {
                   )}
                   <div className="font-bold">{player.name}</div>
                   <div className="text-2xl">{player.score}</div>
-                  {state.gameType === 'x01' && (
-                    <div className="text-sm mt-1">
-                      Avg: {getPlayerAverage(state, player.id)}
-                    </div>
-                  )}
+                  <div className="text-sm mt-1">
+                    {state.gameType === 'cricket' ? 
+                      `Targets/Dart: ${getPlayerAverage(state, player.id)}` :
+                      `Avg: ${getPlayerAverage(state, player.id)}`}
+                  </div>
                 </div>
               ))}
             </div>

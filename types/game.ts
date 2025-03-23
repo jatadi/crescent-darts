@@ -64,6 +64,7 @@ export type GameState = {
     [playerId: string]: {
       totalScore: number;
       dartsThrown: number;
+      targetsHit?: number;
     };
   };
   currentRound: number;
