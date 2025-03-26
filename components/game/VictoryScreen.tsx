@@ -98,6 +98,20 @@ export default function VictoryScreen() {
           <div className="text-white mb-8">
             <p>Final Average: {stats ? (stats.totalScore / stats.dartsThrown).toFixed(1) : '0'} per dart</p>
             <p>Total Darts: {stats?.dartsThrown || 0}</p>
+            
+            {state.redemptionMode && (
+              <div className="mt-4">
+                <p className="inline-block bg-blue-500 px-3 py-1 rounded-full text-sm">
+                  {state.overtime ? 'Overtime Victory' : 'Redemption Mode'} 
+                </p>
+                {state.firstFinishedPlayerId === winner.id && (
+                  <p className="mt-2 text-yellow-300">Pole Position Winner</p>
+                )}
+                {state.firstFinishedPlayerId !== winner.id && (
+                  <p className="mt-2 text-green-300">Redemption Winner</p>
+                )}
+              </div>
+            )}
           </div>
         )}
         <div className="space-x-4">

@@ -146,7 +146,9 @@ export async function saveGameHistory(gameState: GameState): Promise<boolean> {
           (gameState.settings as X01Settings).startingScore : 
           null,
         winner_id: gameState.winnerId,
-        settings: gameState.settings
+        settings: gameState.settings,
+        redemption_mode: gameState.redemptionMode || false,
+        overtime: gameState.overtime || false
       })
       .select()
       .single();
@@ -171,7 +173,9 @@ export async function saveGameHistory(gameState: GameState): Promise<boolean> {
         final_score: player.score,
         darts_thrown: gameState.playerStats[player.id].dartsThrown,
         total_score: gameState.playerStats[player.id].totalScore,
-        targets_hit: gameState.gameType === 'cricket' ? gameState.playerStats[player.id].targetsHit || 0 : null
+        targets_hit: gameState.gameType === 'cricket' ? gameState.playerStats[player.id].targetsHit || 0 : null,
+        finished: gameState.gameType === 'x01' ? (player as any).finished || false : null,
+        redemption_status: gameState.gameType === 'x01' ? (player as any).redemptionStatus : null
       };
 
       // For cricket games, also store the final cricket scores

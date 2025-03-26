@@ -24,6 +24,8 @@ export interface X01PlayerState {
     totalScore: number;
     dartsThrown: number;
   };
+  finished: boolean;
+  redemptionStatus: 'pole_position' | 'on_the_bubble' | 'redemption' | null;
 }
 
 // Cricket specific types
@@ -70,6 +72,9 @@ export type GameState = {
   currentRound: number;
   maxRounds?: number;
   winnerId?: string;
+  firstFinishedPlayerId?: string | null;
+  redemptionMode: boolean;
+  overtime: boolean;
 };
 
 // Add this to your existing types/game.ts

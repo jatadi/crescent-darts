@@ -13,6 +13,8 @@ interface GameHistory {
   created_at: string;
   starting_score: number | null;
   settings: any;
+  redemption_mode?: boolean;
+  overtime?: boolean;
   game_players: {
     player: Player;
     player_id: string;
@@ -21,6 +23,8 @@ interface GameHistory {
     darts_thrown: number;
     targets_hit?: number;
     cricket_scores?: any;
+    finished?: boolean;
+    redemption_status?: 'pole_position' | 'on_the_bubble' | 'redemption' | null;
   }[];
 }
 
@@ -73,6 +77,8 @@ export default function GameHistory() {
               <div>
                 <h2 className="text-xl font-semibold">
                   {game.game_type}{game.starting_score ? ` - ${game.starting_score}` : ''}
+                  {game.redemption_mode && <span className="ml-2 text-sm bg-blue-500 text-white px-2 py-1 rounded">Redemption</span>}
+                  {game.overtime && <span className="ml-2 text-sm bg-purple-500 text-white px-2 py-1 rounded">Overtime</span>}
                 </h2>
                 <p className="text-gray-500">
                   {format(new Date(game.created_at), 'PPp')}
@@ -85,7 +91,20 @@ export default function GameHistory() {
                         key={gp.player_id}
                         className={`p-2 rounded ${gp.player_id === game.winner?.id ? 'bg-green-100 dark:bg-green-900' : ''}`}
                       >
-                        <p className="font-medium">{gp.player.name}</p>
+                        <div className="flex items-center mb-1">
+                          <p className="font-medium">{gp.player.name}</p>
+                          {gp.redemption_status && (
+                            <span className={`ml-2 text-xs px-2 py-0.5 rounded-full text-white
+                              ${gp.redemption_status === 'pole_position' ? 'bg-blue-500' : 
+                                gp.redemption_status === 'on_the_bubble' ? 'bg-orange-500' : 
+                                'bg-green-500'}`}
+                            >
+                              {gp.redemption_status === 'pole_position' ? 'First' : 
+                               gp.redemption_status === 'on_the_bubble' ? 'Bubble' : 
+                               'Redemption'}
+                            </span>
+                          )}
+                        </div>
                         {renderPlayerStats(game, gp)}
                       </div>
                     ))}
