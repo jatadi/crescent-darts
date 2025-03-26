@@ -14,10 +14,7 @@ export interface X01Settings {
   doubleOut: boolean;
 }
 
-export interface X01PlayerState {
-  id: string;
-  name: string;
-  photo_url?: string;
+export interface X01PlayerState extends Player {
   score: number;
   current: boolean;
   stats: {
@@ -25,7 +22,8 @@ export interface X01PlayerState {
     dartsThrown: number;
   };
   finished: boolean;
-  redemptionStatus: 'pole_position' | 'on_the_bubble' | 'redemption' | null;
+  redemptionStatus: 'pole_position' | 'redemption' | 'on_the_bubble' | null;
+  eliminated: boolean;
 }
 
 // Cricket specific types
@@ -75,6 +73,7 @@ export type GameState = {
   firstFinishedPlayerId?: string | null;
   redemptionMode: boolean;
   overtime: boolean;
+  overtimeRound: number;
 };
 
 // Add this to your existing types/game.ts

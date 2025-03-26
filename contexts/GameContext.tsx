@@ -38,7 +38,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           current: index === 0,
           stats: { totalScore: 0, dartsThrown: 0 },
           finished: false,
-          redemptionStatus: null
+          redemptionStatus: null,
+          eliminated: false
         })) as X01PlayerState[];
 
         return {
@@ -61,7 +62,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           }), {}),
           firstFinishedPlayerId: null,
           redemptionMode: false,
-          overtime: false
+          overtime: false,
+          overtimeRound: 0
         } as GameState;
       } else {
         const players = action.players.map((player, index) => ({
@@ -136,12 +138,89 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         const currentPlayerIndex = state.players.findIndex(p => p.current);
         const nextPlayerIndex = (currentPlayerIndex + 1) % state.players.length;
 
+        // If in redemption mode, eliminate the player who busted
+        if (state.redemptionMode) {
+          const firstFinisherIndex = state.players.findIndex(p => p.id === state.firstFinishedPlayerId);
+          const isRedemptionRoundComplete = nextPlayerIndex <= firstFinisherIndex;
+
+          // Mark current player as eliminated and check if redemption round is complete
+          const updatedPlayers = state.players.map((player, index) => ({
+            ...player,
+            current: index === nextPlayerIndex,
+            eliminated: player.id === currentTurn.playerId ? true : (player as X01PlayerState).eliminated,
+            score: player.id === currentTurn.playerId ? turnStartScore : player.score
+          })) as X01PlayerState[];
+
+          if (isRedemptionRoundComplete) {
+            // Check if anyone hit their redemption shot
+            const hasRedemptionFinishers = updatedPlayers.some(p => 
+              p.id !== state.firstFinishedPlayerId && p.finished
+            );
+
+            if (hasRedemptionFinishers) {
+              // At least one player hit their redemption shot - enter overtime
+              // Include both pole position player and redemption finishers
+              return {
+                ...state,
+                players: updatedPlayers.map((player, index) => ({
+                  ...player,
+                  current: player.id === state.firstFinishedPlayerId, // Start with pole position player
+                  score: player.finished ? 101 : player.score, // Reset all finishers to 101
+                  finished: false // Reset finished state for overtime
+                })),
+                overtime: true,
+                redemptionMode: false,
+                currentTurn: {
+                  playerId: state.firstFinishedPlayerId!, // Start with pole position player
+                  dartsThrown: 0,
+                  scores: []
+                },
+                turns: [...state.turns, { playerId: currentTurn.playerId, scores: newScores }],
+                playerStats: updatedStats
+              } as GameState;
+            } else {
+              // No one hit their redemption shot - pole position player wins
+              const finalState = {
+                ...state,
+                players: updatedPlayers.map(p => ({
+                  ...p,
+                  current: false
+                })),
+                gameOver: true,
+                winnerId: state.firstFinishedPlayerId,
+                currentTurn: {
+                  ...currentTurn,
+                  dartsThrown,
+                  scores: newScores
+                },
+                turns: [...state.turns, { playerId: currentTurn.playerId, scores: newScores }],
+                playerStats: updatedStats
+              } as GameState;
+
+              saveGameHistory(finalState).catch(console.error);
+              return finalState;
+            }
+          }
+
+          return {
+            ...state,
+            players: updatedPlayers,
+            currentTurn: {
+              playerId: state.players[nextPlayerIndex].id,
+              dartsThrown: 0,
+              scores: []
+            },
+            turns: [...state.turns, { playerId: currentTurn.playerId, scores: newScores }],
+            playerStats: updatedStats
+          } as GameState;
+        }
+
+        // Regular bust handling (not in redemption mode)
         return {
           ...state,
           players: (state.players as X01PlayerState[]).map((player, index) => ({
             ...player,
             current: index === nextPlayerIndex,
-            // Reset score to start of turn if current player
             score: player.id === currentTurn.playerId ? turnStartScore : player.score
           })),
           currentTurn: {
@@ -157,98 +236,146 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       // Check for finish (score reaches 0)
       if (newScore === 0) {
         const currentPlayerIndex = state.players.findIndex(p => p.current);
-        let gameOver = false;
-        let winnerId = undefined;
-        let redemptionMode = state.redemptionMode;
-        let overtime = state.overtime;
-        let firstFinishedPlayerId = state.firstFinishedPlayerId;
-        let resetPlayersForOvertime = false;
-        
-        // If this is the first player to finish
-        if (!state.redemptionMode && !state.firstFinishedPlayerId) {
-          // Check if this is the last player in order
-          const isLastPlayer = currentPlayerIndex === state.players.length - 1;
-          
+        const isLastPlayer = currentPlayerIndex === state.players.length - 1;
+
+        // First player to finish in the game
+        if (!state.firstFinishedPlayerId) {
+          // If last player finishes first, they win immediately
           if (isLastPlayer) {
-            // If last player in order finishes first, game over
-            gameOver = true;
-            winnerId = currentTurn.playerId;
-          } else {
-            // Otherwise, enter redemption mode
-            redemptionMode = true;
-            firstFinishedPlayerId = currentTurn.playerId;
+            const finalState = {
+              ...state,
+              players: state.players.map(p => ({
+                ...p,
+                current: false,
+                finished: p.id === currentTurn.playerId
+              })),
+              gameOver: true,
+              winnerId: currentTurn.playerId,
+              currentTurn: {
+                ...currentTurn,
+                dartsThrown,
+                scores: newScores
+              },
+              turns: [...state.turns, { playerId: currentTurn.playerId, scores: newScores }],
+              playerStats: updatedStats
+            } as GameState;
+
+            saveGameHistory(finalState).catch(console.error);
+            return finalState;
           }
-        } 
-        // If we're in redemption mode and another player finishes
-        else if (state.redemptionMode) {
-          const allPlayersAfterFirst = getAllPlayersAfterIndex(
-            state.players.findIndex(p => p.id === state.firstFinishedPlayerId),
-            state.players
-          );
-          
-          // Check if we've gone through all players who had a chance at redemption
-          const isLastEligiblePlayer = currentPlayerIndex === state.players.length - 1;
-          
-          if (isLastEligiblePlayer) {
-            // Multiple players finished, enter overtime
-            overtime = true;
-            gameOver = false;
-            resetPlayersForOvertime = true;
-          }
+
+          // Not last player - enter redemption mode for players after current player
+          return {
+            ...state,
+            players: state.players.map((player, index) => ({
+              ...player,
+              current: index === currentPlayerIndex + 1,
+              finished: player.id === currentTurn.playerId,
+              eliminated: index < currentPlayerIndex // Only eliminate players before the first finisher
+            })),
+            redemptionMode: true,
+            firstFinishedPlayerId: currentTurn.playerId,
+            currentTurn: {
+              playerId: state.players[currentPlayerIndex + 1].id,
+              dartsThrown: 0,
+              scores: []
+            },
+            turns: [...state.turns, { playerId: currentTurn.playerId, scores: newScores }],
+            playerStats: updatedStats
+          } as GameState;
         }
         
-        // Mark the current player as finished
-        const updatedPlayers = (state.players as X01PlayerState[]).map((player, index) => {
-          const isCurrentPlayer = player.id === currentTurn.playerId;
-          
-          // Assign redemption status
-          let redemptionStatus = player.redemptionStatus;
-          if (isCurrentPlayer && newScore === 0) {
-            if (!state.firstFinishedPlayerId && !state.redemptionMode) {
-              redemptionStatus = 'pole_position';
-            } else if (state.redemptionMode) {
-              redemptionStatus = 'redemption';
-            }
-          } else if (state.redemptionMode && !player.finished && player.id !== state.firstFinishedPlayerId) {
-            redemptionStatus = 'on_the_bubble';
-          }
-          
-          // Handle next player logic
-          let isCurrent = false;
-          if (!gameOver) {
-            const nextPlayerIndex = (currentPlayerIndex + 1) % state.players.length;
-            isCurrent = index === nextPlayerIndex;
-          }
-          
-          // For overtime, reset qualified players to 101
-          let playerScore = player.score;
-          if (resetPlayersForOvertime) {
-            if (player.finished) {
-              playerScore = 101; // Reset to 101 for overtime
-            }
-          } else if (isCurrentPlayer) {
-            playerScore = newScore;
-          }
-          
-          return {
+        // Player finishes during redemption mode
+        if (state.redemptionMode) {
+          // Save current turn state
+          const currentTurnState = {
+            ...currentTurn,
+            dartsThrown,
+            scores: newScores
+          };
+
+          const firstFinisherIndex = state.players.findIndex(p => p.id === state.firstFinishedPlayerId);
+          const nextPlayerIndex = (currentPlayerIndex + 1) % state.players.length;
+          const isRedemptionRoundComplete = isLastPlayer || nextPlayerIndex <= firstFinisherIndex;
+
+          // Mark current player as finished
+          const updatedPlayers = state.players.map((player, index) => ({
             ...player,
-            score: playerScore,
-            current: isCurrent,
-            finished: isCurrentPlayer ? true : player.finished,
-            redemptionStatus
-          } as X01PlayerState;
-        });
+            finished: player.id === currentTurn.playerId ? true : (player as X01PlayerState).finished
+          })) as X01PlayerState[];
+
+          // Count finished players
+          const finishedPlayers = (updatedPlayers as X01PlayerState[]).filter(p => p.finished).length;
+
+          if (isRedemptionRoundComplete) {
+            if (finishedPlayers > 1) {
+              // Multiple players finished - enter overtime
+              return {
+                ...state,
+                players: updatedPlayers.map((player, index) => ({
+                  ...player,
+                  current: player.finished && index === firstFinisherIndex,
+                  eliminated: !player.finished,
+                  score: player.finished ? 101 : player.score // Reset finished players to 101
+                })),
+                overtime: true,
+                redemptionMode: false,
+                currentTurn: {
+                  playerId: state.firstFinishedPlayerId!,
+                  dartsThrown: 0,
+                  scores: []
+                },
+                turns: [...state.turns, { playerId: currentTurn.playerId, scores: currentTurnState.scores }],
+                playerStats: updatedStats
+              } as GameState;
+            } else {
+              // Only first finisher succeeded - they win
+              const finalState = {
+                ...state,
+                players: updatedPlayers.map(p => ({
+                  ...p,
+                  current: false,
+                  eliminated: !p.finished
+                })),
+                gameOver: true,
+                winnerId: state.firstFinishedPlayerId,
+                currentTurn: currentTurnState,
+                turns: [...state.turns, { playerId: currentTurn.playerId, scores: currentTurnState.scores }],
+                playerStats: updatedStats
+              } as GameState;
+
+              saveGameHistory(finalState).catch(console.error);
+              return finalState;
+            }
+          }
+
+          // Continue redemption round - next player's turn
+          return {
+            ...state,
+            players: updatedPlayers.map((player, index) => ({
+              ...player,
+              current: index === nextPlayerIndex
+            })),
+            currentTurn: {
+              playerId: state.players[nextPlayerIndex].id,
+              dartsThrown: 0,
+              scores: []
+            },
+            turns: [...state.turns, { playerId: currentTurn.playerId, scores: currentTurnState.scores }],
+            playerStats: updatedStats
+          } as GameState;
+        }
         
-        // If we're finished and not in overtime, save game
-        if (gameOver && !overtime) {
+        // Player finishes during overtime - they win immediately
+        if (state.overtime) {
           const finalState = {
             ...state,
-            players: updatedPlayers,
-            gameOver,
-            winnerId,
-            redemptionMode,
-            overtime,
-            firstFinishedPlayerId,
+            players: state.players.map(p => ({
+              ...p,
+              current: false
+            })) as X01PlayerState[],
+            gameOver: true,
+            winnerId: currentTurn.playerId,
             currentTurn: {
               ...currentTurn,
               dartsThrown,
@@ -257,23 +384,73 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             turns: [...state.turns, { playerId: currentTurn.playerId, scores: newScores }],
             playerStats: updatedStats
           } as GameState;
-          
+
           saveGameHistory(finalState).catch(console.error);
           return finalState;
         }
-        
-        // Continue the game, either in redemption mode or overtime
-        const nextPlayerIndex = (currentPlayerIndex + 1) % state.players.length;
-        
+
+        // Update player states
+        const updatedPlayers = (state.players as X01PlayerState[]).map((player, index) => {
+          const isCurrentPlayer = player.id === currentTurn.playerId;
+          const firstFinisherIndex = state.firstFinishedPlayerId ? 
+            state.players.findIndex(p => p.id === state.firstFinishedPlayerId) : 
+            currentPlayerIndex;
+          
+          // Determine next player - skip eliminated players
+          let isCurrent = false;
+          if (!state.gameOver) {
+            let nextPlayerIndex = (currentPlayerIndex + 1) % state.players.length;
+            // Skip eliminated players
+            while (nextPlayerIndex !== currentPlayerIndex && 
+                   (index < firstFinisherIndex || player.eliminated)) {
+              nextPlayerIndex = (nextPlayerIndex + 1) % state.players.length;
+            }
+            isCurrent = index === nextPlayerIndex;
+          }
+
+          return {
+            ...player,
+            score: isCurrentPlayer ? newScore : player.score,
+            current: isCurrent,
+            finished: isCurrentPlayer ? true : player.finished,
+            eliminated: index < firstFinisherIndex || player.eliminated,
+            redemptionStatus: isCurrentPlayer ? 
+              (!state.firstFinishedPlayerId ? 'pole_position' : 'redemption') : 
+              (state.redemptionMode && !player.finished && !player.eliminated ? 'on_the_bubble' : player.redemptionStatus)
+          } as X01PlayerState;
+        });
+
+        // If game is over, save the history
+        if (state.gameOver) {
+          const finalState = {
+            ...state,
+            players: updatedPlayers,
+            gameOver: true,
+            winnerId: state.winnerId,
+            currentTurn: {
+              ...currentTurn,
+              dartsThrown,
+              scores: newScores
+            },
+            turns: [...state.turns, { playerId: currentTurn.playerId, scores: newScores }],
+            playerStats: updatedStats
+          } as GameState;
+
+          saveGameHistory(finalState).catch(console.error);
+          return finalState;
+        }
+
+        // Continue game
+        const nextPlayer = updatedPlayers.find(p => p.current);
         return {
           ...state,
           players: updatedPlayers,
-          gameOver,
-          redemptionMode,
-          overtime,
-          firstFinishedPlayerId,
+          gameOver: false,
+          redemptionMode: true,
+          overtime: false,
+          firstFinishedPlayerId: currentTurn.playerId,
           currentTurn: {
-            playerId: state.players[nextPlayerIndex].id,
+            playerId: nextPlayer?.id || state.players[0].id,
             dartsThrown: 0,
             scores: []
           },
@@ -285,67 +462,164 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       // Auto switch after 3 darts
       if (dartsThrown === 3) {
         const currentPlayerIndex = state.players.findIndex(p => p.current);
-        const nextPlayerIndex = (currentPlayerIndex + 1) % state.players.length;
+        const isLastPlayer = currentPlayerIndex === state.players.length - 1;
+        
+        // Save the current turn before switching players
+        const currentTurnState = {
+          ...currentTurn,
+          dartsThrown,
+          scores: newScores
+        };
 
-        // Check if we've gone through all players in redemption mode
-        if (state.redemptionMode && currentPlayerIndex === state.players.length - 1) {
-          // Check if any players hit a redemption
-          const anyRedemption = (state.players as X01PlayerState[]).some(
-            p => p.id !== state.firstFinishedPlayerId && p.finished
-          );
-          
-          if (anyRedemption) {
-            // Set up overtime (everyone who finished goes to 101, others eliminated)
-            const updatedPlayers = (state.players as X01PlayerState[]).map((player, index) => {
-              const isCurrent = index === 0 && player.finished;
+        // Check if we need to end redemption mode
+        if (state.redemptionMode) {
+          const firstFinisherIndex = state.players.findIndex(p => p.id === state.firstFinishedPlayerId);
+          const nextPlayerIndex = (currentPlayerIndex + 1) % state.players.length;
+          const isRedemptionRoundComplete = isLastPlayer || nextPlayerIndex <= firstFinisherIndex;
+
+          // If player used all 3 darts without finishing, they're eliminated
+          const updatedPlayers = state.players.map((player, index) => ({
+            ...player,
+            current: index === nextPlayerIndex,
+            eliminated: player.id === currentTurn.playerId ? true : (player as X01PlayerState).eliminated,
+            score: player.id === currentTurn.playerId ? newScore : player.score
+          })) as X01PlayerState[];
+
+          if (isRedemptionRoundComplete) {
+            // Check if anyone hit their redemption shot
+            const hasRedemptionFinishers = updatedPlayers.some(p => 
+              p.id !== state.firstFinishedPlayerId && p.finished
+            );
+
+            if (hasRedemptionFinishers) {
+              // At least one player hit their redemption shot - enter overtime
+              // Include both pole position player and redemption finishers
               return {
-                ...player,
-                current: isCurrent,
-                score: player.finished ? 101 : player.score
-              } as X01PlayerState;
-            });
+                ...state,
+                players: updatedPlayers.map((player, index) => ({
+                  ...player,
+                  current: player.id === state.firstFinishedPlayerId, // Start with pole position player
+                  score: player.finished ? 101 : player.score, // Reset all finishers to 101
+                  finished: false // Reset finished state for overtime
+                })),
+                overtime: true,
+                redemptionMode: false,
+                currentTurn: {
+                  playerId: state.firstFinishedPlayerId!, // Start with pole position player
+                  dartsThrown: 0,
+                  scores: []
+                },
+                turns: [...state.turns, { playerId: currentTurn.playerId, scores: currentTurnState.scores }],
+                playerStats: updatedStats
+              } as GameState;
+            } else {
+              // No one hit their redemption shot - pole position player wins
+              const finalState = {
+                ...state,
+                players: updatedPlayers.map(p => ({
+                  ...p,
+                  current: false,
+                  eliminated: !p.finished
+                })),
+                gameOver: true,
+                winnerId: state.firstFinishedPlayerId,
+                currentTurn: currentTurnState,
+                turns: [...state.turns, { playerId: currentTurn.playerId, scores: currentTurnState.scores }],
+                playerStats: updatedStats
+              } as GameState;
+
+              saveGameHistory(finalState).catch(console.error);
+              return finalState;
+            }
+          }
+
+          return {
+            ...state,
+            players: updatedPlayers,
+            currentTurn: {
+              playerId: state.players[nextPlayerIndex].id,
+              dartsThrown: 0,
+              scores: []
+            },
+            turns: [...state.turns, { playerId: currentTurn.playerId, scores: currentTurnState.scores }],
+            playerStats: updatedStats
+          } as GameState;
+        }
+
+        // Handle overtime mode
+        if (state.overtime) {
+          // Find the next player who is in overtime (has score of 101)
+          let nextPlayerIndex = currentPlayerIndex;
+          let nextPlayerFound = false;
+          
+          // Loop through the players starting from the current player
+          for (let i = 1; i <= state.players.length; i++) {
+            const candidateIndex = (currentPlayerIndex + i) % state.players.length;
+            const candidatePlayer = state.players[candidateIndex];
             
-            return {
-              ...state,
-              players: updatedPlayers,
-              overtime: true,
-              currentTurn: {
-                playerId: updatedPlayers.find(p => p.current)?.id || state.players[0].id,
-                dartsThrown: 0,
-                scores: []
-              },
-              turns: [...state.turns, { playerId: currentTurn.playerId, scores: newScores }],
-              playerStats: updatedStats
-            } as GameState;
-          } else {
-            // No redemptions, game over with original finishing player as winner
+            if (candidatePlayer.score === 101) {
+              nextPlayerIndex = candidateIndex;
+              nextPlayerFound = true;
+              break;
+            }
+          }
+
+          // If no next player found, game should be over (shouldn't happen)
+          if (!nextPlayerFound) {
             const finalState = {
               ...state,
-              players: (state.players as X01PlayerState[]).map(p => ({
+              players: state.players.map(p => ({
                 ...p,
                 current: false
               })),
               gameOver: true,
-              winnerId: state.firstFinishedPlayerId,
-              currentTurn: {
-                ...currentTurn,
-                dartsThrown,
-                scores: newScores
-              },
-              turns: [...state.turns, { playerId: currentTurn.playerId, scores: newScores }],
+              winnerId: currentTurn.playerId,
+              currentTurn: currentTurnState,
+              turns: [...state.turns, { playerId: currentTurn.playerId, scores: currentTurnState.scores }],
               playerStats: updatedStats
             } as GameState;
-            
+
             saveGameHistory(finalState).catch(console.error);
             return finalState;
           }
+
+          return {
+            ...state,
+            players: state.players.map((player, index) => ({
+              ...player,
+              current: index === nextPlayerIndex,
+              score: player.id === currentTurn.playerId ? newScore : player.score
+            })),
+            currentTurn: {
+              playerId: state.players[nextPlayerIndex].id,
+              dartsThrown: 0,
+              scores: []
+            },
+            turns: [...state.turns, { playerId: currentTurn.playerId, scores: currentTurnState.scores }],
+            playerStats: updatedStats
+          } as GameState;
         }
+
+        // Normal play (not overtime or end of redemption)
+        const nextPlayerIndex = (currentPlayerIndex + 1) % state.players.length;
+        
+        // Increment round when we've gone through all players
+        const nextRound = nextPlayerIndex === 0 ? 
+          state.currentRound + 1 : 
+          state.currentRound;
+
+        // Check if game should end (in cricket)
+        const maxRounds = (state.gameType as GameType) === 'cricket' ? 
+          ((state.settings as CricketSettings).rounds || 20) : undefined;
+        const gameOver = maxRounds !== undefined && nextRound > maxRounds;
 
         return {
           ...state,
-          players: (state.players as X01PlayerState[]).map((player, index) => ({
+          currentRound: nextRound,
+          gameOver,
+          players: state.players.map((player, index) => ({
             ...player,
-            current: index === nextPlayerIndex,
+            current: gameOver ? false : index === nextPlayerIndex,
             score: player.id === currentTurn.playerId ? newScore : player.score
           })),
           currentTurn: {
@@ -353,7 +627,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             dartsThrown: 0,
             scores: []
           },
-          turns: [...state.turns, { playerId: currentTurn.playerId, scores: newScores }],
+          turns: [...state.turns, { playerId: currentTurn.playerId, scores: currentTurnState.scores }],
           playerStats: updatedStats
         } as GameState;
       }
@@ -376,6 +650,47 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
     case 'NEXT_PLAYER': {
       const currentPlayerIndex = state.players.findIndex(p => p.current);
+      
+      // Handle overtime mode differently
+      if (state.overtime) {
+        // Find the next qualified player (who finished during redemption)
+        let nextPlayerIndex = currentPlayerIndex;
+        let nextPlayerFound = false;
+        
+        // Loop through the players starting from the current player
+        for (let i = 1; i <= state.players.length; i++) {
+          const candidateIndex = (currentPlayerIndex + i) % state.players.length;
+          const candidatePlayer = state.players[candidateIndex];
+          
+          // Check if this player is qualified (they finished during redemption)
+          if ('finished' in candidatePlayer && candidatePlayer.finished) {
+            nextPlayerIndex = candidateIndex;
+            nextPlayerFound = true;
+            break;
+          }
+        }
+        
+        // If no next player was found (shouldn't happen), just use the first player
+        if (!nextPlayerFound) {
+          nextPlayerIndex = state.players.findIndex(p => 'finished' in p && p.finished);
+          if (nextPlayerIndex === -1) nextPlayerIndex = 0;
+        }
+        
+        return {
+          ...state,
+          players: state.players.map((player, index) => ({
+            ...player,
+            current: index === nextPlayerIndex,
+          })),
+          currentTurn: {
+            playerId: state.players[nextPlayerIndex].id,
+            dartsThrown: 0,
+            scores: [],
+          },
+        } as GameState;
+      }
+
+      // Regular play (not overtime)
       const nextPlayerIndex = (currentPlayerIndex + 1) % state.players.length;
       
       // Increment round when we've gone through all players
@@ -384,8 +699,9 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         state.currentRound;
 
       // Check if game should end (in cricket)
-      const gameOver = state.gameType === 'cricket' && 
-        nextRound > (state.settings as CricketSettings).rounds;
+      const maxRounds = (state.gameType as GameType) === 'cricket' ? 
+        ((state.settings as CricketSettings).rounds || 20) : undefined;
+      const gameOver = maxRounds !== undefined && nextRound > maxRounds;
 
       return {
         ...state,
@@ -681,7 +997,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     winnerId: undefined,
     firstFinishedPlayerId: null,
     redemptionMode: false,
-    overtime: false
+    overtime: false,
+    overtimeRound: 0
   });
 
   return (

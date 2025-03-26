@@ -112,6 +112,19 @@ export default function VictoryScreen() {
                 )}
               </div>
             )}
+            
+            {state.overtime && (
+              <div className="mt-4">
+                <p className="inline-block bg-purple-500 px-3 py-1 rounded-full text-sm">
+                  Overtime Victory {state.overtimeRound > 1 ? `(Round ${state.overtimeRound})` : ''}
+                </p>
+                <p className="mt-2 text-purple-300">
+                  {state.firstFinishedPlayerId === winner.id ? 
+                    `Original Finisher Won${state.overtimeRound > 1 ? ' After Multiple Rounds' : ''}` : 
+                    `Redemption Player Won${state.overtimeRound > 1 ? ' After Multiple Rounds' : ''}`}
+                </p>
+              </div>
+            )}
           </div>
         )}
         <div className="space-x-4">
