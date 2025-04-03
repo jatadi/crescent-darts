@@ -548,7 +548,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 
         // Handle overtime mode
         if (state.overtime) {
-          // Find the next player who is in overtime (has score of 101)
+          // Find the next player who is in overtime (score of 101 or less)
           let nextPlayerIndex = currentPlayerIndex;
           let nextPlayerFound = false;
           
@@ -557,7 +557,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             const candidateIndex = (currentPlayerIndex + i) % state.players.length;
             const candidatePlayer = state.players[candidateIndex];
             
-            if (candidatePlayer.score === 101) {
+            // In overtime, players are active if they started at 101 (were finishers)
+            if (candidatePlayer.score <= 101) {
               nextPlayerIndex = candidateIndex;
               nextPlayerFound = true;
               break;
@@ -583,6 +584,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
             return finalState;
           }
 
+          // Continue overtime - next player's turn
           return {
             ...state,
             players: state.players.map((player, index) => ({
